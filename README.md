@@ -47,6 +47,18 @@ python scripts/fetch_ocean_sample.py
 python scripts/inspect_ocean_sample.py data\raw\oscar-final-20200101-20200130\oscar-final-20200101-20200130.nc
 ```
 
+## Processing
+
+Phase 3 turns a sample into a validated time series of current speed and direction. Extraction supports a single point (nearest grid point) or a regional mean, over a chronological window. Missing and invalid values are flagged rather than filled. Direction uses the oceanographic "toward" convention (degrees clockwise from true north, in `[0, 360)`). Speed is normalized against a cited 0–2.5 m s⁻¹ range. Defaults live in `backend/app/config.py`. Rules, citations and limitations are in [`docs/processing-methodology.md`](docs/processing-methodology.md).
+
+```python
+from app.services.series_extraction import extract_default_series
+from app.services.current_processing import process_current_series
+
+series = process_current_series(extract_default_series("data/raw/.../sample.nc"))
+print(series.model_dump_json(indent=2))
+```
+
 Install the optional development dependency before running tests:
 
 ```powershell
