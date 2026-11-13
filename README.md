@@ -35,3 +35,21 @@ The health check is available at `http://127.0.0.1:8000/health`. FastAPI's inter
 ### Configuration
 
 Settings are read from environment variables with the `EARTH_JUKEBOX_` prefix. A root `.env` file is read for local development; `.env` files are ignored by Git. See `.env.example` for the supported settings.
+
+## Ocean dataset sample
+
+Phase 2 uses OSCAR v2.0 Final as its initial dataset candidate. Review [`docs/ocean-dataset-decision.md`](docs/ocean-dataset-decision.md) for the comparison, evidence, sample selection, and current access blocker.
+
+The sample fetcher uses NASA Harmony for server-side time, variable, and spatial subsetting. CMR discovery is public; retrieving transformed data requires an Earthdata Login account. Set an Earthdata bearer token in `EARTHDATA_TOKEN` in your local shell before fetching. Never put the token in `.env`, `.netrc`, or source control. The fetcher writes raw data only under the Git-ignored `data/raw/` directory and enforces a size limit.
+
+```powershell
+python scripts/fetch_ocean_sample.py
+python scripts/inspect_ocean_sample.py data\raw\oscar-final-20200101-20200130\oscar-final-20200101-20200130.nc
+```
+
+Install the optional development dependency before running tests:
+
+```powershell
+python -m pip install -e "backend[dev]"
+python -m pytest
+```

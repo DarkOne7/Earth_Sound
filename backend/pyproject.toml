@@ -6,7 +6,6 @@ build-backend = "setuptools.build_meta"
 name = "earth-jukebox-backend"
 version = "0.1.0"
 description = "Backend for turning ocean measurements into reproducible soundscapes."
-readme = "../README.md"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi",
@@ -14,9 +13,13 @@ dependencies = [
     "numpy",
     "pandas",
     "pydantic-settings",
+    "requests",
     "uvicorn",
     "xarray",
 ]
+
+[project.optional-dependencies]
+dev = ["pytest"]
 
 [tool.setuptools.packages.find]
 where = ["."]

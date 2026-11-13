@@ -9,6 +9,13 @@ env/
 .env
 .env.*
 !.env.example
+.netrc
+_netrc
+
+# Downloaded scientific data and caches
+data/raw/
+data/processed/
+data/.cache/
 
 # Common local tooling output
 .pytest_cache/
