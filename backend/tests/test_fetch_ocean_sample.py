@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -75,7 +76,7 @@ def test_harmony_request_uses_documented_subset_axes_and_netcd4_format():
         bbox=(-152.0, 0.0, -150.0, 2.0),
     )
     assert ("format", "application/x-netcdf4") in params
-    assert ("subset", "time(2020-01-01T00:00:00Z:2020-01-30T23:59:59Z)") in params
+    assert ("subset", 'time("2020-01-01T00:00:00Z":"2020-01-30T23:59:59Z")') in params
     assert ("subset", "lat(0.0:2.0)") in params
     assert ("subset", "lon(-152.0:-150.0)") in params
 
@@ -96,10 +97,11 @@ def test_harmony_job_location_must_remain_on_trusted_https_host():
         _job_url(response, {})
 
 
-def test_fetch_writes_bounded_sample_and_idempotently_reuses_matching_record(
-    monkeypatch, tmp_path
-):
-    monkeypatch.chdir(tmp_path)
+NETCDF_PAYLOAD = b"CDF\x01small mocked NetCDF payload"
+
+
+def _patch_catalog(monkeypatch, repo_root):
+    monkeypatch.setattr(fetcher, "REPO_ROOT", repo_root)
     monkeypatch.setattr(fetcher, "find_collection", lambda *_: {"id": "C-test"})
     monkeypatch.setattr(
         fetcher,
@@ -113,33 +115,103 @@ def test_fetch_writes_bounded_sample_and_idempotently_reuses_matching_record(
             }
         ],
     )
-    content = b"small mocked NetCDF payload"
-    response = FakeResponse(
-        chunks=[content],
-        headers={"Content-Type": "application/x-netcdf", "Content-Length": str(len(content))},
-    )
 
-    class Session:
-        def __init__(self):
-            self.calls = []
 
-        def get(self, url, **kwargs):
-            self.calls.append((url, kwargs))
-            return response
+class RecordingSession:
+    def __init__(self, content=NETCDF_PAYLOAD):
+        self.calls = []
+        self.content = content
 
+    def get(self, url, **kwargs):
+        self.calls.append((url, kwargs))
+        return FakeResponse(
+            chunks=[self.content],
+            headers={"Content-Type": "application/x-netcdf", "Content-Length": str(len(self.content))},
+        )
+
+
+def test_fetch_writes_bounded_sample_and_idempotently_reuses_matching_record(
+    monkeypatch, tmp_path
+):
+    _patch_catalog(monkeypatch, tmp_path)
     args = parse_args([])
-    args.output_dir = tmp_path / "raw"
-    session = Session()
+    session = RecordingSession()
     outputs = fetch_sample(args, session=session)
-    assert len(outputs) == 1
-    assert outputs[0].read_bytes() == content
+    assert outputs == [tmp_path / "data/raw/oscar-final-20200101-20200130/oscar-final-20200101-20200130.nc"]
+    assert outputs[0].read_bytes() == NETCDF_PAYLOAD
     assert (tmp_path / "data/metadata/oscar-final-20200101-20200130.retrieval.json").is_file()
     assert len(session.calls) == 1
 
-    second_session = Session()
+    second_session = RecordingSession()
     reused = fetch_sample(args, session=second_session)
     assert reused == outputs
     assert second_session.calls == []
+
+
+def test_record_paths_are_repo_relative_and_reused_from_another_cwd(monkeypatch, tmp_path):
+    repo = tmp_path / "repo"
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir(parents=True)
+    _patch_catalog(monkeypatch, repo)
+    monkeypatch.chdir(elsewhere)
+    outputs = fetch_sample(parse_args([]), session=RecordingSession())
+    assert outputs[0].is_relative_to(repo)
+    assert not (elsewhere / "data").exists()
+
+    record = json.loads((repo / "data/metadata/oscar-final-20200101-20200130.retrieval.json").read_text())
+    assert record["outputs"][0]["path"] == "data/raw/oscar-final-20200101-20200130/oscar-final-20200101-20200130.nc"
+
+    monkeypatch.chdir(repo / "data")
+    second_session = RecordingSession()
+    assert fetch_sample(parse_args([]), session=second_session) == outputs
+    assert second_session.calls == []
+
+
+def test_different_bbox_variables_or_output_dir_get_separate_samples(monkeypatch, tmp_path):
+    _patch_catalog(monkeypatch, tmp_path)
+    default = fetch_sample(parse_args([]), session=RecordingSession())
+
+    other_bbox = fetch_sample(parse_args(["--bbox", "-10", "0", "-8", "2"]), session=RecordingSession())
+    other_vars = fetch_sample(parse_args(["--variables", "u"]), session=RecordingSession())
+    other_dir_args = parse_args([])
+    other_dir_args.output_dir = tmp_path / "custom"
+    other_dir_session = RecordingSession()
+    other_dir = fetch_sample(other_dir_args, session=other_dir_session)
+
+    paths = {default[0], other_bbox[0], other_vars[0], other_dir[0]}
+    assert len(paths) == 4
+    assert other_dir_session.calls, "a new --output-dir must not reuse the default sample"
+    assert other_dir[0].parent == tmp_path / "custom"
+    records = sorted((tmp_path / "data/metadata").glob("*.retrieval.json"))
+    assert len(records) == 4
+    assert all(path.is_file() for path in paths)
+
+
+def test_dates_are_compared_as_dates_and_normalized():
+    args = parse_args(["--start-date", "2020-1-5", "--end-date", "2020-01-30"])
+    assert (args.start_date, args.end_date) == ("2020-01-05", "2020-01-30")
+    with pytest.raises(SystemExit):
+        parse_args(["--start-date", "2020-10-01", "--end-date", "2020-9-01"])
+
+
+def test_non_netcdf_response_is_rejected_and_removed(tmp_path):
+    response = FakeResponse(
+        chunks=[b"<!DOCTYPE html><html>Earthdata Login</html>"],
+        headers={"Content-Type": "text/html"},
+    )
+    destination = tmp_path / "sample.nc"
+    with pytest.raises(FetchError, match="not a NetCDF file"):
+        _stream_response(response, destination, max_bytes=1024)
+    assert not destination.exists()
+    assert not Path(str(destination) + ".part").exists()
+
+
+@pytest.mark.parametrize("signature", [b"CDF\x01", b"CDF\x02", b"\x89HDF\r\n\x1a\n"])
+def test_netcdf_signatures_are_accepted_across_chunks(tmp_path, signature):
+    payload = signature + b"payload"
+    response = FakeResponse(chunks=[payload[:3], payload[3:]])
+    result = _stream_response(response, tmp_path / "sample.nc", max_bytes=1024)
+    assert result["bytes"] == len(payload)
 
 
 def test_response_declared_over_limit_is_refused_before_streaming(tmp_path):

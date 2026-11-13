@@ -27,6 +27,10 @@ DEFAULT_VARIABLES = ("u", "v")
 DEFAULT_MAX_BYTES = 25 * 1024 * 1024
 MAX_GRANULES = 100
 CHUNK_BYTES = 64 * 1024
+REPO_ROOT = Path(__file__).resolve().parents[1]
+# Classic NetCDF (CDF1/2/5) and NetCDF-4 (HDF5) file signatures.
+NETCDF_SIGNATURES = (b"CDF\x01", b"CDF\x02", b"CDF\x05", b"\x89HDF\r\n\x1a\n")
+SIGNATURE_BYTES = 8
 
 
 class FetchError(RuntimeError):
@@ -73,14 +77,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         args.start_date = None
         args.end_date = None
     try:
-        if args.start_date:
-            datetime.strptime(args.start_date, "%Y-%m-%d")
-        if args.end_date:
-            datetime.strptime(args.end_date, "%Y-%m-%d")
+        start = datetime.strptime(args.start_date, "%Y-%m-%d").date() if args.start_date else None
+        end = datetime.strptime(args.end_date, "%Y-%m-%d").date() if args.end_date else None
     except ValueError as exc:
         parser.error(f"dates must use YYYY-MM-DD: {exc}")
-    if args.start_date and args.end_date and args.start_date > args.end_date:
+    if start and end and start > end:
         parser.error("--start-date must be on or before --end-date")
+    # Normalize to zero-padded ISO dates so CMR and Harmony always get valid timestamps.
+    args.start_date = start.isoformat() if start else None
+    args.end_date = end.isoformat() if end else None
     if args.no_bbox:
         args.bbox = None
     elif args.bbox:
@@ -205,7 +210,7 @@ def _request_params(
         params.append(
             (
                 "subset",
-                f"time({start_date}T00:00:00Z:{end_date}T23:59:59Z)",
+                f'time("{start_date}T00:00:00Z":"{end_date}T23:59:59Z")',
             )
         )
     if bbox:
@@ -326,6 +331,15 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _require_netcdf_signature(header: bytes, response: requests.Response) -> None:
+    if not any(header.startswith(signature) for signature in NETCDF_SIGNATURES):
+        content_type = response.headers.get("Content-Type", "unknown")
+        raise FetchError(
+            f"Downloaded response is not a NetCDF file (Content-Type {content_type!r}); "
+            "this is usually an Earthdata Login page. The partial file was removed."
+        )
+
+
 def _stream_response(
     response: requests.Response,
     destination: Path,
@@ -351,6 +365,7 @@ def _stream_response(
     destination.parent.mkdir(parents=True, exist_ok=True)
     temporary = destination.with_name(destination.name + ".part")
     total = 0
+    header = b""
     digest = hashlib.sha256()
     try:
         with temporary.open("wb") as target:
@@ -363,15 +378,34 @@ def _stream_response(
                         f"Remote response exceeded the {max_bytes}-byte cap while streaming; "
                         "the partial file was removed."
                     )
+                if len(header) < SIGNATURE_BYTES:
+                    header += chunk[: SIGNATURE_BYTES - len(header)]
+                    if len(header) == SIGNATURE_BYTES:
+                        _require_netcdf_signature(header, response)
                 target.write(chunk)
                 digest.update(chunk)
         if total == 0:
             raise FetchError("Harmony returned an empty data response.")
+        _require_netcdf_signature(header, response)
         temporary.replace(destination)
     except Exception:
         temporary.unlink(missing_ok=True)
         raise
     return {"path": str(destination), "bytes": total, "sha256": digest.hexdigest()}
+
+
+def _portable_path(path: Path) -> str:
+    """Record paths relative to the repo root when possible so records work from any cwd."""
+    resolved = path.resolve()
+    try:
+        return resolved.relative_to(REPO_ROOT).as_posix()
+    except ValueError:
+        return str(resolved)
+
+
+def _resolve_recorded_path(value: str) -> Path:
+    path = Path(value)
+    return path if path.is_absolute() else REPO_ROOT / path
 
 
 def _matching_existing_record(record_path: Path, selection: dict[str, Any]) -> list[dict[str, Any]] | None:
@@ -387,13 +421,14 @@ def _matching_existing_record(record_path: Path, selection: dict[str, Any]) -> l
     if not outputs:
         return None
     for output in outputs:
-        path = Path(output.get("path", ""))
-        if not path.is_file() or _sha256(path) != output.get("sha256"):
+        path = _resolve_recorded_path(output.get("path", ""))
+        if not output.get("path") or not path.is_file() or _sha256(path) != output.get("sha256"):
             return None
     return outputs
 
 
 def fetch_sample(args: argparse.Namespace, *, session: requests.Session | None = None) -> list[Path]:
+    bbox = tuple(args.bbox) if args.bbox else None
     discovery = requests.Session()
     collection = find_collection(discovery, args.collection, args.version)
     collection_id = str(collection["id"])
@@ -403,9 +438,8 @@ def fetch_sample(args: argparse.Namespace, *, session: requests.Session | None =
         granule_name=args.granule_name,
         start_date=args.start_date,
         end_date=args.end_date,
-        bbox=None if args.no_bbox else tuple(args.bbox) if args.bbox else None,
+        bbox=bbox,
     )
-    bbox = None if args.no_bbox else tuple(args.bbox) if args.bbox else None
     catalog_size_mb = _check_catalog_size(
         granules,
         bbox=bbox,
@@ -413,9 +447,10 @@ def fetch_sample(args: argparse.Namespace, *, session: requests.Session | None =
         allow_large=args.allow_large,
     )
 
-    sample_name = _sample_name(args)
-    output_dir = args.output_dir or Path("data/raw") / sample_name
-    record_path = Path("data/metadata") / f"{sample_name}.retrieval.json"
+    custom_output_dir = _portable_path(args.output_dir) if args.output_dir else None
+    sample_name = _sample_name(args, bbox=bbox, custom_output_dir=custom_output_dir)
+    output_dir = args.output_dir.resolve() if args.output_dir else REPO_ROOT / "data" / "raw" / sample_name
+    record_path = REPO_ROOT / "data" / "metadata" / f"{sample_name}.retrieval.json"
     selection = {
         "collection": args.collection,
         "version": args.version,
@@ -425,13 +460,14 @@ def fetch_sample(args: argparse.Namespace, *, session: requests.Session | None =
         "end_date": args.end_date,
         "bbox_wgs84": list(bbox) if bbox else None,
         "variables": list(args.variables),
+        "output_dir": _portable_path(output_dir),
         "max_bytes": args.max_bytes,
         "allow_large": bool(args.allow_large),
     }
     existing = _matching_existing_record(record_path, selection)
     if existing:
         print(f"Sample already matches its retrieval record; leaving it unchanged: {record_path}")
-        return [Path(item["path"]) for item in existing]
+        return [_resolve_recorded_path(item["path"]) for item in existing]
 
     if session is None:
         session = create_authenticated_session()
@@ -484,6 +520,7 @@ def fetch_sample(args: argparse.Namespace, *, session: requests.Session | None =
                 already_written=total_written,
                 allow_large=args.allow_large,
             )
+            result["path"] = _portable_path(destination)
             outputs.append(result)
             total_written += result["bytes"]
         else:
@@ -513,12 +550,12 @@ def fetch_sample(args: argparse.Namespace, *, session: requests.Session | None =
                     already_written=total_written,
                     allow_large=args.allow_large,
                 )
+                result["path"] = _portable_path(destination)
                 outputs.append(result)
                 total_written += result["bytes"]
     except Exception:
-        response.close()
         for output in outputs:
-            Path(output["path"]).unlink(missing_ok=True)
+            _resolve_recorded_path(output["path"]).unlink(missing_ok=True)
         raise
     finally:
         response.close()
@@ -550,14 +587,33 @@ def fetch_sample(args: argparse.Namespace, *, session: requests.Session | None =
     for output in outputs:
         print(f"Saved {output['path']} ({output['bytes']} bytes, SHA-256 {output['sha256']})")
     print(f"Retrieval record: {record_path}")
-    return [Path(item["path"]) for item in outputs]
+    return [_resolve_recorded_path(item["path"]) for item in outputs]
 
 
-def _sample_name(args: argparse.Namespace) -> str:
+def _sample_name(
+    args: argparse.Namespace,
+    *,
+    bbox: tuple[float, float, float, float] | None,
+    custom_output_dir: str | None,
+) -> str:
+    """Name the sample from its selection; non-default subsets get a short stable suffix."""
     if args.granule_name:
         selection = re.sub(r"[^A-Za-z0-9-]+", "-", args.granule_name).strip("-")
     else:
         selection = f"{args.start_date.replace('-', '')}-{args.end_date.replace('-', '')}"
+    variant = {
+        "bbox": list(bbox) if bbox else None,
+        "variables": list(args.variables),
+        "output_dir": custom_output_dir,
+    }
+    default_variant = {
+        "bbox": list(DEFAULT_BBOX),
+        "variables": list(DEFAULT_VARIABLES),
+        "output_dir": None,
+    }
+    if variant != default_variant:
+        encoded = json.dumps(variant, sort_keys=True).encode("utf-8")
+        selection += "-" + hashlib.sha256(encoded).hexdigest()[:8]
     if args.collection == DEFAULT_COLLECTION:
         return f"oscar-final-{selection}"
     product = re.sub(r"[^a-z0-9]+", "-", args.collection.lower()).strip("-")
