@@ -1,0 +1,1 @@
+"""Earth Jukebox backend application."""

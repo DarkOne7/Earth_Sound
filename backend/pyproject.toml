@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "earth-jukebox-backend"
+version = "0.1.0"
+description = "Backend for turning ocean measurements into reproducible soundscapes."
+readme = "../README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "netCDF4",
+    "numpy",
+    "pandas",
+    "pydantic-settings",
+    "uvicorn",
+    "xarray",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]

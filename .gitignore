@@ -1,0 +1,19 @@
+# Python bytecode and environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
+# Common local tooling output
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
