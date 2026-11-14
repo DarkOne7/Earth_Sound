@@ -1,0 +1,29 @@
+{
+  "retrieved_at_utc": "2026-11-14T10:55:25.312230+00:00",
+  "provider": "Our World In Data (WHO-compiled COVID-19 cases and deaths)",
+  "source_url": "https://raw.githubusercontent.com/owid/covid-19-data/master/public/data/cases_deaths/full_data.csv",
+  "upstream_bytes": 20120449,
+  "upstream_sha256": "462d509b1d4d1ffde0a8cabe023da0956f2ed40c8c0f119482390306fff56eba",
+  "subset_file": "data/raw/owid-covid-weekly/owid-covid-weekly.csv",
+  "subset_sha256": "fed0486c66f486efbbe530cc9fe6efe443c8b69dc136b34e21d1278587e70930",
+  "subset_rows": 1674,
+  "rows_per_location": {
+    "World": 1674
+  },
+  "date_min": "2020-01-05",
+  "date_max": "2024-08-04",
+  "columns": [
+    "date",
+    "location",
+    "new_cases",
+    "new_deaths",
+    "total_cases",
+    "total_deaths",
+    "weekly_cases",
+    "weekly_deaths",
+    "biweekly_cases",
+    "biweekly_deaths"
+  ],
+  "license": "Our World In Data: CC BY 4.0. Underlying data compiled from WHO.",
+  "citation": "Edouard Mathieu, Hannah Ritchie, Lucas Rodes-Guirao et al. (2020) 'Coronavirus Pandemic (COVID-19)'. Published online at OurWorldInData.org. Underlying data: World Health Organization."
+}

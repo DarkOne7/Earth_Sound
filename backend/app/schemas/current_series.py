@@ -10,6 +10,8 @@ from typing import Any, Literal
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.references import NormalizationReference
+
 
 class SampleStatus(str, Enum):
     """Quality status assigned to every processed sample."""
@@ -76,15 +78,19 @@ class ExtractedSeries:
     cell_counts: tuple[int, ...] | None = None
 
 
-class NormalizationReference(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    quantity: str
-    minimum: float
-    maximum: float
-    units: str
-    source: str
-    url: str
+# Re-exported so existing imports of NormalizationReference keep working; the
+# model itself is shared with the other data domains.
+__all__ = [
+    "CurrentSample",
+    "ExtractedSeries",
+    "NormalizationReference",
+    "ProcessedCurrentSeries",
+    "SampleFlag",
+    "SampleStatus",
+    "SelectionParameters",
+    "SeriesMetadata",
+    "SeriesSummary",
+]
 
 
 class SeriesMetadata(BaseModel):
