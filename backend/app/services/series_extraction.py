@@ -169,8 +169,40 @@ def _sha256(path: Path) -> str:
     return _sha256_cached(str(path.resolve()), stat.st_mtime_ns, stat.st_size)
 
 
+#: Non-standard CF calendars whose decoded calendar labels are accepted as UTC
+#: Gregorian datetimes. OSCAR v2.0 declares ``calendar = "julian"`` with
+#: ``units = "days since 1990-1-1"``, but its ``time_bounds`` attribute and the CMR
+#: granule temporal extent both give the Gregorian day (e.g. 2020-01-01). Julian and
+#: Gregorian day counts from 1990-01-01 are identical until 2100-02-28, so the
+#: labels are the intended dates; a true Julian instant would be 13 days later.
+LABEL_PRESERVING_CALENDARS = frozenset({"julian"})
+LABEL_PRESERVING_UNTIL = datetime(2100, 2, 28, 23, 59, 59, tzinfo=UTC)
+
+
+def _cftime_to_utc(values: np.ndarray, time_name: str) -> list[datetime]:
+    converted = []
+    for value in values:
+        calendar = str(getattr(value, "calendar", "")).lower()
+        if calendar not in LABEL_PRESERVING_CALENDARS:
+            raise SeriesExtractionError(
+                f"Time coordinate {time_name!r} uses calendar {calendar or 'unknown'!r}; only standard "
+                f"calendars and {sorted(LABEL_PRESERVING_CALENDARS)} are supported."
+            )
+        label = datetime(
+            value.year, value.month, value.day, value.hour, value.minute, value.second, value.microsecond, tzinfo=UTC
+        )
+        if label > LABEL_PRESERVING_UNTIL:
+            raise SeriesExtractionError(
+                f"Time {label.isoformat()} is past 2100-02-28, where Julian and Gregorian day counts diverge."
+            )
+        converted.append(label)
+    return converted
+
+
 def _time_axis(dataset: xr.Dataset, time_name: str) -> list[datetime]:
     values = dataset[time_name].values
+    if values.dtype == object and values.size and all(hasattr(v, "calendar") for v in values):
+        return _cftime_to_utc(values, time_name)
     if not np.issubdtype(values.dtype, np.datetime64):
         raise SeriesExtractionError(
             f"Time coordinate {time_name!r} was not decoded to datetimes (dtype {values.dtype})."

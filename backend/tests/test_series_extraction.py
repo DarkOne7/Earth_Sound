@@ -297,3 +297,48 @@ def test_source_hash_is_cached_and_tracks_changes(tmp_path):
     assert series_extraction._sha256_cached.cache_info().hits == hits_before + 1
     write_sample(path, u=np.full((12, 3, 3), 0.1))
     assert series_extraction._sha256(path) != first
+
+
+def _write_calendar_sample(path, calendar, days):
+    import netCDF4
+
+    with netCDF4.Dataset(path, "w") as d:
+        d.createDimension("time", len(days))
+        d.createDimension("longitude", 2)
+        d.createDimension("latitude", 2)
+        t = d.createVariable("time", "f8", ("time",))
+        t.units = "days since 1990-1-1"
+        t.calendar = calendar
+        t.standard_name = "time"
+        t[:] = days
+        lat = d.createVariable("lat", "f8", ("latitude",))
+        lat.standard_name = "latitude"
+        lat.units = "degrees_north"
+        lat[:] = [0.0, 0.25]
+        lon = d.createVariable("lon", "f8", ("longitude",))
+        lon.standard_name = "longitude"
+        lon.units = "degrees_east"
+        lon[:] = [208.0, 208.25]
+        for name in ("u", "v"):
+            var = d.createVariable(name, "f8", ("time", "longitude", "latitude"), fill_value=-999.0)
+            var.units = "m s-1"
+            var.coordinates = "lon lat"
+            var[:] = 0.2
+    return path
+
+
+def test_oscar_julian_calendar_labels_are_read_as_utc_dates(tmp_path):
+    # OSCAR v2.0: days since 1990-1-1, calendar "julian"; 10957.5 -> 2020-01-01 12:00 label.
+    path = _write_calendar_sample(tmp_path / "julian.nc", "julian", [10957.5, 10958.5, 10959.5])
+    series = extract_point_series(path, latitude=0.0, longitude=-152.0, start="2020-01-01", end="2020-01-03")
+    assert series.timestamps == (
+        datetime(2020, 1, 1, 12, tzinfo=UTC),
+        datetime(2020, 1, 2, 12, tzinfo=UTC),
+        datetime(2020, 1, 3, 12, tzinfo=UTC),
+    )
+
+
+def test_other_non_standard_calendars_are_rejected(tmp_path):
+    path = _write_calendar_sample(tmp_path / "360.nc", "360_day", [10800.5, 10801.5])
+    with pytest.raises(SeriesExtractionError, match="360_day"):
+        extract_point_series(path, latitude=0.0, longitude=-152.0, start="2020-01-01", end="2020-01-03")
