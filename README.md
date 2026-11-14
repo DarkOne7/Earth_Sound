@@ -77,6 +77,7 @@ The fetcher streams the 20 MB published table, records the SHA-256 of the exact 
 The project also scans the visible part of the STScI CALSPEC Sirius reference spectrum. Wavelength maps to pitch from C3 at 380 nm to C5 at 780 nm, and relative spectral flux maps to loudness. See [`docs/sirius-spectrum-decision.md`](docs/sirius-spectrum-decision.md) for the source citations, pitch-to-wavelength table, processing rules, and limits. The spectrum-specific renderer is separate from the ocean/COVID time-series engine because it uses wavelength as pitch.
 
 ```powershell
+New-Item -ItemType Directory -Force data/raw | Out-Null
 Invoke-WebRequest -Uri "https://ssb.stsci.edu/cdbs/calspec/sirius_stis_005.fits" -OutFile "data/raw/sirius_stis_005.fits"
 python scripts/render_sirius_spectrum.py data/raw/sirius_stis_005.fits
 ```

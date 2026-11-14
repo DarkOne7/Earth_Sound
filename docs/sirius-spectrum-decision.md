@@ -17,8 +17,8 @@ The project already had a deterministic 30-second WAV renderer for validated tim
 | CALSPEC catalogue | <https://www.stsci.edu/hst/instrumentation/reference-data-for-calibration-and-tools/astronomical-catalogs/calspec> |
 | Spectrum extension | FITS `SCI` binary table, wavelength / flux columns |
 | Target | Sirius (`SIRIUS`) |
-| Flux-scale reference in file header | Bohlin et al. 2020, *AJ*, 160, 21 |
-| File pedigree in header | `INFLIGHT 1997 to 2022` |
+| Flux-scale reference in file header (`SOURCE`) | Flux scale of Bohlin, et al. 2020, *AJ*, 160, 21 |
+| File pedigree in header (`PEDIGREE`) | `INFLIGHT 1997 to 2022` |
 | Raw FITS SHA-256 | `1349da7b8b59ad035aefea8d7948f552b41b3897d07e5ad82ca162a53af97271` |
 | Selected range | 380 to 780 nm (visible light) |
 
@@ -35,7 +35,7 @@ MIDI note = 48 + 24 * (wavelength_nm - 380) / 400
 frequency_hz = 440 * 2 ** ((MIDI note - 69) / 12)
 ```
 
-The mapping covers two octaves across 400 nm: one semitone is 16.667 nm, and each 1 nm bin moves by 0.06 semitone. These are audible synthesized pitches, **not** the physical frequency of the light. The light itself is far above the human hearing range. Lower wavelengths begin at C3; higher wavelengths rise in pitch toward C5.
+The mapping covers two octaves across 400 nm: one semitone is 16.667 nm, and each 1 nm bin moves by 0.06 semitone. Pitch glides continuously through the scan rather than stepping, so each bin sweeps from its lower-edge pitch to its upper-edge pitch and the first and last samples are exactly C3 and C5. These are audible synthesized pitches, **not** the physical frequency of the light. The light itself is far above the human hearing range. Lower wavelengths begin at C3; higher wavelengths rise in pitch toward C5.
 
 | Note anchor | Wavelength | Colour region |
 |---|---:|---|
@@ -67,13 +67,14 @@ The mapping covers two octaves across 400 nm: one semitone is 16.667 nm, and eac
 
 Pitch is the spectral position. **Loudness is flux:** each bin's mean calibrated flux is logarithmically normalized between the minimum and maximum measured visible flux in this selection, then mapped from -36 dB to 0 dB. A brighter part of the spectrum sounds louder; a flux dip, including an absorption feature if it is wide enough to survive 1 nm averaging, sounds quieter. Loudness cannot identify an element by itself, and narrow absorption lines are smoothed by the binning.
 
-The `C4`-to-`C5` labels are pitch anchors; the 400 individual bin pitches lie at 1 nm intervals between them and are listed with flux and gain in the provenance JSON. Timing is scan position, not stellar time. Stereo is centered dual mono, and the instrument is a pure sine tone.
+The `C3`-to-`C5` labels are pitch anchors; each of the 400 bins is listed in the provenance JSON with its centre (`midi_note`), start and end pitch (`midi_start`, `midi_end`), flux and gain. Each bin is one pulse: a 10 ms linear attack from silence, a sustain, and a 50 ms linear release that ends at silence. Timing is scan position, not stellar time. Stereo is centered dual mono, and the instrument is a pure sine tone.
 
 ## Outputs and reproduction
 
 Download the public spectrum and render it from the repository root:
 
 ```powershell
+New-Item -ItemType Directory -Force data/raw | Out-Null
 Invoke-WebRequest -Uri "https://ssb.stsci.edu/cdbs/calspec/sirius_stis_005.fits" -OutFile "data/raw/sirius_stis_005.fits"
 python scripts/render_sirius_spectrum.py data/raw/sirius_stis_005.fits
 ```
@@ -83,7 +84,11 @@ Outputs:
 - `data/processed/sirius-visible-spectrum.wav` (Git-ignored; 30 seconds, 44.1 kHz, stereo, 16-bit PCM)
 - `data/metadata/sirius-visible-spectrum.soundscape.json` (committed render provenance and all 400 per-bin mappings)
 
-Reference WAV SHA-256: `7bad63fa6433fc37c55edf6790d11343eacd2f0bcf71b789c2ec0389388d241b`.
+Reference WAV SHA-256 (processing version 1.1.0): `e6fa29e2f42372ee3e195f7f578c4255ce3102f0f9761f4386ec070c02b04111`.
+
+The render is byte-identical on the same platform and NumPy build. Across platforms, differences in floating-point `sin` can move isolated PCM samples by one least-significant bit, so the hash may differ. As with the time-series engine, two renders count as equivalent when their provenance (excluding `audio.sha256`) is identical and every PCM sample differs by at most 1 LSB. The statement is also embedded in the provenance JSON (`determinism`).
+
+The renderer checks that the file's `TARGETID` is `SIRIUS` and reads `PEDIGREE` and the flux-scale `SOURCE` from the file header. A different CALSPEC Sirius file can be rendered, but its provenance records `source_url: null` because only `sirius_stis_005.fits` has a documented download location here.
 
 ## References
 
