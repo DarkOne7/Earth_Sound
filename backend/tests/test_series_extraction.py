@@ -194,3 +194,32 @@ def test_default_extraction_uses_config(sample):
     assert len(series.timestamps) == 12
     region = extract_default_series(sample, mode="region", settings=settings)
     assert region.selection.mode == "region"
+
+
+def test_time_coordinate_identified_by_cf_units_only(tmp_path):
+    path = tmp_path / "time_counter.nc"
+    shape = (len(TIMES), len(LONS_360), len(LATS))
+    dataset = xr.Dataset(
+        {
+            "u": (("time_counter", "x", "y"), np.full(shape, 0.3), {"units": "m s-1"}),
+            "v": (("time_counter", "x", "y"), np.full(shape, 0.4), {"units": "m s-1"}),
+        },
+        coords={"time_counter": TIMES, "x": LONS_360, "y": LATS},
+    )
+    dataset["x"].attrs["units"] = "degrees_east"
+    dataset["y"].attrs["units"] = "degrees_north"
+    dataset.to_netcdf(path, encoding={"time_counter": {"units": "days since 2000-01-01"}})
+    dataset.close()
+    with xr.open_dataset(path) as opened:
+        assert "standard_name" not in opened["time_counter"].attrs
+        assert resolve_coordinate(opened, "time") == "time_counter"
+    series = extract_point_series(path, latitude=0.375, longitude=-151.75, start="2020-01-01", end="2020-01-12")
+    assert len(series.timestamps) == 12
+
+
+def test_region_converted_sentinel_is_invalid(tmp_path):
+    u = np.full((12, 3, 3), 10.0)
+    u[0, 0, 0] = -99900.0  # -999 m/s after conversion, not the raw fill value
+    path = write_sample(tmp_path / "cms.nc", u=u, v=np.full((12, 3, 3), 10.0), units="cm s-1")
+    series = extract_region_series(path, south=0.0, north=1.0, west=-152.0, east=-151.5, start="2020-01-01", end="2020-01-12")
+    assert series.forced_status[0] is SampleStatus.INVALID

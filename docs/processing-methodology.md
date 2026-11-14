@@ -1,6 +1,6 @@
 # Processing methodology (Phase 3)
 
-**Processing version:** `1.0.0` (`backend/app/services/reference_ranges.py`, `PROCESSING_VERSION`)  
+**Processing version:** `1.0.1` (`backend/app/services/reference_ranges.py`, `PROCESSING_VERSION`)  
 **Date:** 2026-11-13  
 **Scope:** turn an OSCAR v2.0 `u`/`v` sample into a validated, normalized time series of current speed and direction for the sonification layer (Phase 4).
 
@@ -23,7 +23,7 @@ UMM-Var query (public, no credentials): <https://cmr.earthdata.nasa.gov/search/v
 ## Extraction
 
 - **Loading:** through the Phase 2 loader (`open_ocean_dataset`), with CF decoding, so the file's own `_FillValue` and `missing_value` become NaN.
-- **Coordinates:** identified from the file's CF attributes: `standard_name` (`latitude`, `longitude`, `time`), `units` (`degrees_north`, `degrees_east`) or `axis` (`Y`, `X`, `T`). If none match, the extractor falls back only to the UMM-Var dimension names (`latitude`, `longitude`, `time`). Ambiguous or missing coordinates raise `SeriesExtractionError`. Dimension order is irrelevant because selection is by name.
+- **Coordinates:** identified from the file's CF attributes: `standard_name` (`latitude`, `longitude`, `time`), `units` (`degrees_north`, `degrees_east`, or CF time units `<unit> since <reference>`, read from attributes or from xarray's decoded encoding) or `axis` (`Y`, `X`, `T`). If none match, the extractor falls back only to the UMM-Var dimension names (`latitude`, `longitude`, `time`). Ambiguous or missing coordinates raise `SeriesExtractionError`. Dimension order is irrelevant because selection is by name.
 - **Longitude:** requests may use either −180..180 or 0..360. A request is converted to the file's convention, which is 0..360 if any longitude exceeds 180 and −180..180 otherwise.
 - **Point mode:** uses the nearest grid point. Longitude distance is measured around the circle. Ties go to the lowest index. A request farther than one grid step (the median coordinate spacing) from every grid point is rejected. The grid coordinates actually used are recorded.
 - **Region mode:** inclusive bounds; `west > east` means the region crosses the antimeridian. For each timestamp:
@@ -57,11 +57,11 @@ Note: the meteorological wind convention ("comes from") differs by 180°. A test
 
 ## Validity rules and status values
 
-Each component is classified first, then the two classifications are combined:
+Each component is classified first, then the two classifications are combined. The −999.0 sentinel is a file value, so it is compared before unit conversion. A value that only equals −999 after conversion (for example −99900 cm s⁻¹) is out of range, so it is `invalid`, not `missing`.
 
 | Condition | Component status |
 |---|---|
-| NaN (masked `_FillValue` / `missing_value`, land, ice or grid gap) or exactly −999.0 | missing |
+| NaN (masked `_FillValue` / `missing_value`, land, ice or grid gap), or a **raw (unconverted)** value of exactly −999.0 | missing |
 | ±infinity | invalid |
 | Outside [−3.0, 3.0] m s⁻¹ (bounds inclusive) | invalid |
 | Otherwise | valid |
@@ -79,7 +79,7 @@ Only `valid` and `undefined_direction` samples carry numbers. For `missing` and 
 
 ## Minimum-samples rule
 
-`usable = valid + undefined_direction`. If `usable < minimum_usable_samples` (default **10**, setting `EARTH_JUKEBOX_MINIMUM_USABLE_SAMPLES`), processing raises `InsufficientDataError`. The fully flagged series is attached as `.series` for diagnostics. Nothing is padded.
+`usable = valid + undefined_direction`. If `usable < minimum_usable_samples` (default **10**, read from `Settings.minimum_usable_samples` / `EARTH_JUKEBOX_MINIMUM_USABLE_SAMPLES` when the caller passes no explicit value), processing raises `InsufficientDataError`. The fully flagged series is attached as `.series` for diagnostics. Nothing is padded.
 
 The value 10 is a **product design choice, not a scientific constant**. It is one third of the default 30-day window, which leaves roughly 3 seconds of a 30-second soundscape per usable day. Phase 4 may revise it.
 

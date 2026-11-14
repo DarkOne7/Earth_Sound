@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import math
+import re
 from datetime import UTC, date, datetime, time
 from pathlib import Path
 from typing import Literal
@@ -40,6 +41,25 @@ _AXIS_RULES = {
     },
     "time": {"standard_name": "time", "units": set(), "axis": "T", "documented_name": "time"},
 }
+
+# CF time units: "<unit> since <reference>" (CF Conventions section 4.4).
+_CF_TIME_UNITS = re.compile(
+    r"^\s*(days?|d|hours?|hrs?|hr|h|minutes?|mins?|min|seconds?|secs?|sec|s|"
+    r"milliseconds?|msecs?|ms|microseconds?|us)\s+since\s+\S",
+    re.IGNORECASE,
+)
+
+
+def _units_text(variable: xr.Variable) -> str:
+    """Units from attributes, or from encoding when xarray already decoded them."""
+    units = variable.attrs.get("units", variable.encoding.get("units", ""))
+    return str(units).strip()
+
+
+def _matches_axis_units(axis: str, units: str) -> bool:
+    if axis == "time":
+        return bool(_CF_TIME_UNITS.match(units))
+    return units.lower().replace(" ", "_") in _AXIS_RULES[axis]["units"]
 
 
 class SeriesExtractionError(ValueError):
@@ -77,9 +97,12 @@ def resolve_coordinate(dataset: xr.Dataset, axis: Literal["latitude", "longitude
             continue
         attrs = variable.attrs
         standard_name = str(attrs.get("standard_name", "")).strip().lower()
-        units = str(attrs.get("units", "")).strip().lower().replace(" ", "_")
         axis_attr = str(attrs.get("axis", "")).strip().upper()
-        if standard_name == rules["standard_name"] or units in rules["units"] or axis_attr == rules["axis"]:
+        if (
+            standard_name == rules["standard_name"]
+            or _matches_axis_units(axis, _units_text(variable))
+            or axis_attr == rules["axis"]
+        ):
             candidates.append(str(name))
     if len(candidates) == 1:
         return candidates[0]

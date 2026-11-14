@@ -16,6 +16,7 @@ from collections.abc import Sequence
 
 import numpy as np
 
+from app.config import get_settings
 from app.schemas.current_series import (
     CurrentSample,
     ExtractedSeries,
@@ -45,9 +46,6 @@ DIRECTION_CONVENTION = (
 DIRECTION_NORMALIZATION = (
     "direction_deg / 360, range [0, 1); 360 wraps to 0. Null when direction is undefined."
 )
-
-# Default minimum number of usable samples. Overridden by settings in practice.
-DEFAULT_MINIMUM_USABLE_SAMPLES = 10
 
 
 class CurrentProcessingError(ValueError):
@@ -145,8 +143,12 @@ def normalize_direction(direction_deg: float) -> float:
 
 
 def classify_component(value: float) -> SampleStatus:
-    """Classify one velocity component (already in m s-1)."""
-    if math.isnan(value) or value == DOCUMENTED_COMPONENT_FILL_VALUE:
+    """Classify one velocity component already converted to m s-1.
+
+    The documented fill sentinel is a raw-file value, so callers must check it on
+    the unconverted value; here only NaN (a masked fill) counts as missing.
+    """
+    if math.isnan(value):
         return SampleStatus.MISSING
     if math.isinf(value):
         return SampleStatus.INVALID
@@ -156,7 +158,10 @@ def classify_component(value: float) -> SampleStatus:
 
 
 def component_valid_mask(u: np.ndarray, v: np.ndarray) -> np.ndarray:
-    """Boolean mask of positions where both components are valid."""
+    """Boolean mask of positions where both converted (m s-1) components are valid.
+
+    Fill sentinels are not checked here: they apply to raw values only.
+    """
     u_arr = np.asarray(u, dtype=np.float64)
     v_arr = np.asarray(v, dtype=np.float64)
     low, high = COMPONENT_VALID_RANGE.minimum, COMPONENT_VALID_RANGE.maximum
@@ -164,8 +169,6 @@ def component_valid_mask(u: np.ndarray, v: np.ndarray) -> np.ndarray:
         return (
             np.isfinite(u_arr)
             & np.isfinite(v_arr)
-            & (u_arr != DOCUMENTED_COMPONENT_FILL_VALUE)
-            & (v_arr != DOCUMENTED_COMPONENT_FILL_VALUE)
             & (u_arr >= low)
             & (u_arr <= high)
             & (v_arr >= low)
@@ -226,15 +229,19 @@ def validate_timestamps(timestamps: Sequence) -> None:
 def process_current_series(
     series: ExtractedSeries,
     *,
-    minimum_usable_samples: int = DEFAULT_MINIMUM_USABLE_SAMPLES,
+    minimum_usable_samples: int | None = None,
     speed_reference: ReferenceRange = SPEED_NORMALIZATION_RANGE,
     tolerance: float = NUMERIC_TOLERANCE,
 ) -> ProcessedCurrentSeries:
     """Validate, derive and normalize an extracted u/v series.
 
     Raises ``InsufficientDataError`` (with the flagged series attached) when the
-    number of usable samples is below ``minimum_usable_samples``.
+    number of usable samples is below ``minimum_usable_samples``. When it is
+    ``None`` the configured ``Settings.minimum_usable_samples`` is used
+    (``EARTH_JUKEBOX_MINIMUM_USABLE_SAMPLES``).
     """
+    if minimum_usable_samples is None:
+        minimum_usable_samples = get_settings().minimum_usable_samples
     if minimum_usable_samples < 1:
         raise CurrentProcessingError("minimum_usable_samples must be at least 1")
     count = len(series.timestamps)

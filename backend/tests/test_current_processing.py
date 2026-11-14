@@ -290,3 +290,38 @@ def test_processed_series_is_json_serializable_and_round_trips():
     assert payload["metadata"]["speed_normalization"]["url"].startswith("https://")
     assert "toward" in payload["metadata"]["direction_convention"]
     assert ProcessedCurrentSeries.model_validate(payload) == processed
+
+
+# --- review regressions ----------------------------------------------------
+
+
+def test_converted_value_equal_to_sentinel_is_invalid_not_missing():
+    # -99900 cm/s converts to -999 m/s, but the raw value is not the fill sentinel.
+    processed = process_current_series(
+        make_series([-99900.0] + [10.0] * 10, [10.0] * 11, units="cm s-1"), minimum_usable_samples=1
+    )
+    assert processed.samples[0].status is SampleStatus.INVALID
+    assert processed.summary.missing == 0 and processed.summary.invalid == 1
+
+
+def test_raw_fill_sentinel_is_missing_in_any_units():
+    processed = process_current_series(
+        make_series([-999.0] + [10.0] * 10, [10.0] * 11, units="cm s-1"), minimum_usable_samples=1
+    )
+    assert processed.samples[0].status is SampleStatus.MISSING
+
+
+def test_minimum_usable_samples_defaults_to_settings(monkeypatch):
+    from app.config import get_settings
+
+    monkeypatch.setenv("EARTH_JUKEBOX_MINIMUM_USABLE_SAMPLES", "20")
+    get_settings.cache_clear()
+    try:
+        series = make_series([0.1] * 15, [0.1] * 15)
+        with pytest.raises(InsufficientDataError, match="at least 20 required"):
+            process_current_series(series)
+        monkeypatch.setenv("EARTH_JUKEBOX_MINIMUM_USABLE_SAMPLES", "15")
+        get_settings.cache_clear()
+        assert process_current_series(series).metadata.minimum_usable_samples == 15
+    finally:
+        get_settings.cache_clear()

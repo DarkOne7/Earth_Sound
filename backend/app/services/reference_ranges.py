@@ -17,7 +17,7 @@ CANONICAL_VELOCITY_UNITS = "m s-1"
 NUMERIC_TOLERANCE = 1e-9
 
 #: Version of the processing rules. Bump it whenever a rule or reference changes.
-PROCESSING_VERSION = "1.0.0"
+PROCESSING_VERSION = "1.0.1"
 
 
 @dataclass(frozen=True)
