@@ -84,3 +84,38 @@ def test_inspector_writes_machine_and_human_reports(sample_netcdf, tmp_path):
     text_report = (report_dir / "tiny_ocean_sample.inspection.txt").read_text(encoding="utf-8")
     assert "SST present: no" in text_report
     assert "Global attributes:" in text_report
+
+
+def test_inspector_finds_cf_coordinate_variables_not_named_like_dimensions(tmp_path):
+    # OSCAR v2.0 layout: dims latitude/longitude, coordinate variables lat/lon.
+    path = tmp_path / "oscar_like.nc"
+    dataset = xr.Dataset(
+        {
+            "u": (("time", "longitude", "latitude"), np.zeros((1, 3, 2)), {"units": "m s-1", "coordinates": "lon lat"}),
+            "lat": (("latitude",), [0.0, 0.25], {"standard_name": "latitude", "units": "degrees_north"}),
+            "lon": (("longitude",), [208.0, 208.25, 208.5], {"standard_name": "longitude", "units": "degrees_east"}),
+        },
+        coords={"time": np.array(["2020-01-01"], dtype="datetime64[ns]")},
+    )
+    dataset.to_netcdf(path)
+    report = inspect_netcdf(path)
+    assert report["longitude_convention"] == "0 to 360"
+    assert report["grid_resolution_degrees"] == {"latitude": 0.25, "longitude": 0.25}
+
+
+def test_inspector_coordinate_ranges_ignore_fill_and_apply_scale(tmp_path):
+    import netCDF4
+
+    path = tmp_path / "packed.nc"
+    with netCDF4.Dataset(path, "w") as d:
+        d.createDimension("lon", 3)
+        lon = d.createVariable("lon", "i2", ("lon",), fill_value=-9999)
+        lon.standard_name = "longitude"
+        lon.scale_factor = 0.01
+        lon.set_auto_maskandscale(False)
+        lon[:] = np.array([20800, 20825, -9999], dtype="i2")
+    report = inspect_netcdf(path)
+    lon_summary = report["coordinates"]["lon"]
+    assert lon_summary["minimum"] == pytest.approx(208.0)
+    assert lon_summary["maximum"] == pytest.approx(208.25)
+    assert report["longitude_convention"] == "0 to 360"
