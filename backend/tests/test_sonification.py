@@ -1,3 +1,5 @@
+"""Engine tests: domain-neutral rendering of a SonifiableSeries."""
+
 from __future__ import annotations
 
 import io
@@ -8,36 +10,33 @@ from datetime import UTC, datetime, timedelta
 
 import numpy as np
 import pytest
-from app.schemas.current_series import (
-    CurrentSample,
-    NormalizationReference,
-    ProcessedCurrentSeries,
-    SampleFlag,
-    SampleStatus,
-    SelectionParameters,
-    SeriesMetadata,
-    SeriesSummary,
+from app.schemas.references import NormalizationReference
+from app.schemas.sonifiable import (
+    MappingRule,
+    MappingSource,
+    SeriesProvenance,
+    SonifiableSample,
+    SonifiableSeries,
 )
 from app.schemas.soundscape import SonificationSettings, SoundscapeProvenance
 from app.services.sonification import (
-    AUDIBLE_STATUSES,
-    MAPPINGS,
-    OMITTED_MAPPINGS,
+    ENGINE_MAPPINGS,
     PCM16_FULL_SCALE,
+    RHYTHM_FLOOR_HZ,
     SONIFICATION_VERSION,
     SonificationError,
     carrier_waveform,
+    describe_timing,
     describe_wav,
-    direction_to_pan,
     encode_wav,
     float_to_pcm16,
     gain_db_to_amplitude,
+    level_to_gain_db,
     pan_to_channel_gains,
     plan_segments,
     render_soundscape,
     segment_boundaries,
     segment_envelope,
-    speed_to_gain_db,
 )
 
 T0 = datetime(2020, 1, 1, tzinfo=UTC)
@@ -45,59 +44,59 @@ T0 = datetime(2020, 1, 1, tzinfo=UTC)
 FAST = SonificationSettings(duration_seconds=1.0, sample_rate_hz=8000)
 
 
-def reference(quantity="current speed", minimum=0.0, maximum=2.5):
-    return NormalizationReference(
-        quantity=quantity, minimum=minimum, maximum=maximum, units="m s-1", source="test", url="https://example.test"
-    )
-
-
-def sample(i, *, speed=None, direction=None, status=SampleStatus.VALID, flags=()):
-    audible = status in AUDIBLE_STATUSES
-    return CurrentSample(
+def sample(i, *, level=0.5, pan=0.0, rate=None, audible=True, status="valid", flags=(), values=None):
+    return SonifiableSample(
         timestamp=T0 + timedelta(days=i),
-        u=0.0 if audible else None,
-        v=0.0 if audible else None,
-        speed=speed if audible else None,
-        direction_deg=direction if status is SampleStatus.VALID else None,
-        speed_normalized=(speed / 2.5 if speed is not None else None) if audible else None,
-        direction_normalized=(direction / 360 if direction is not None else None) if status is SampleStatus.VALID else None,
+        audible=audible,
         status=status,
+        level_normalized=level if audible else None,
+        pan=pan if audible else None,
+        rate_normalized=rate if audible else None,
         flags=list(flags),
+        source_values=values or {},
     )
 
 
-def make_series(samples) -> ProcessedCurrentSeries:
-    valid = sum(s.status is SampleStatus.VALID for s in samples)
-    undefined = sum(s.status is SampleStatus.UNDEFINED_DIRECTION for s in samples)
-    return ProcessedCurrentSeries(
-        metadata=SeriesMetadata(
-            dataset="OSCAR_L4_OC_FINAL_V2.0",
-            dataset_version="2.0",
-            source_file="synthetic.nc",
+def make_series(samples, *, domain="test_domain") -> SonifiableSeries:
+    return SonifiableSeries(
+        provenance=SeriesProvenance(
+            domain=domain,
+            dataset="Test dataset",
+            dataset_version="1.0",
+            source_file="synthetic.csv",
             source_sha256="0" * 64,
-            variables={"u": "u", "v": "v"},
-            input_units={"u": "m s-1", "v": "m s-1"},
-            units="m s-1",
-            selection=SelectionParameters(mode="point", start=T0, end=T0 + timedelta(days=30), latitude=1.0, longitude=-151.0),
-            direction_convention="toward, clockwise from north",
-            direction_normalization="deg/360",
-            speed_normalization=reference(),
-            component_valid_range=reference("velocity component (u, v)", -3.0, 3.0),
-            numeric_tolerance=1e-9,
-            minimum_usable_samples=1,
-            processing_version="1.0.2",
+            source_url="https://example.test/data",
+            processing_version="9.9.9",
+            selection={"mode": "synthetic"},
+            cadence="One sample per test step.",
+        ),
+        mapping_source=MappingSource(
+            level_quantity="test quantity",
+            level_reference=NormalizationReference(
+                quantity="test quantity",
+                minimum=0.0,
+                maximum=1.0,
+                units="unit",
+                source="test",
+                url="https://example.test",
+            ),
+            pan_quantity="test pan quantity",
+            pan_rule="pan = test",
         ),
         samples=list(samples),
-        summary=SeriesSummary(
-            total=len(samples),
-            valid=valid,
-            undefined_direction=undefined,
-            missing=sum(s.status is SampleStatus.MISSING for s in samples),
-            invalid=sum(s.status is SampleStatus.INVALID for s in samples),
-            clipped_low=0,
-            clipped_high=sum(SampleFlag.CLIPPED_HIGH in s.flags for s in samples),
-            usable=valid + undefined,
-        ),
+        domain_mappings=[
+            MappingRule(
+                sound_parameter="level_normalized (-> loudness)",
+                source_measurement="test quantity",
+                rule="level = value",
+                rationale="test",
+            )
+        ],
+        omitted_mappings=[
+            MappingRule(
+                sound_parameter="pitch", source_measurement="none", rule="Not rendered.", rationale="test"
+            )
+        ],
     )
 
 
@@ -107,15 +106,15 @@ def decode(wav_bytes: bytes) -> tuple[np.ndarray, int]:
         return frames.reshape(-1, reader.getnchannels()), reader.getframerate()
 
 
-# --- speed -> loudness -------------------------------------------------------
+# --- level -> loudness ------------------------------------------------------
 
 
 @pytest.mark.parametrize(
-    ("speed_normalized", "expected_db"),
+    ("level", "expected_db"),
     [(0.0, -36.0), (0.5, -18.0), (1.0, 0.0), (0.25, -27.0)],
 )
-def test_speed_to_gain_is_linear_in_db(speed_normalized, expected_db):
-    assert speed_to_gain_db(speed_normalized, FAST) == pytest.approx(expected_db)
+def test_level_to_gain_is_linear_in_db(level, expected_db):
+    assert level_to_gain_db(level, FAST) == pytest.approx(expected_db)
 
 
 def test_gain_to_amplitude_matches_decibel_definition():
@@ -124,43 +123,18 @@ def test_gain_to_amplitude_matches_decibel_definition():
     assert gain_db_to_amplitude(-36.0, FAST) == pytest.approx(0.9 * 10 ** (-36 / 20))
 
 
-def test_loudness_increases_monotonically_with_speed():
-    gains = [gain_db_to_amplitude(speed_to_gain_db(s, FAST), FAST) for s in np.linspace(0, 1, 11)]
+def test_loudness_increases_monotonically_with_level():
+    gains = [gain_db_to_amplitude(level_to_gain_db(x, FAST), FAST) for x in np.linspace(0, 1, 11)]
     assert all(a < b for a, b in itertools.pairwise(gains))
 
 
 @pytest.mark.parametrize("bad", [-0.01, 1.01, math.nan, math.inf])
-def test_speed_outside_unit_range_is_rejected(bad):
+def test_level_outside_unit_range_is_rejected(bad):
     with pytest.raises(SonificationError):
-        speed_to_gain_db(bad, FAST)
+        level_to_gain_db(bad, FAST)
 
 
-# --- direction -> pan -------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    ("direction", "expected_pan"),
-    [(0.0, 0.0), (90.0, 1.0), (180.0, 0.0), (270.0, -1.0), (45.0, math.sin(math.radians(45))), (359.999999, 0.0)],
-)
-def test_east_west_component_pans(direction, expected_pan):
-    assert direction_to_pan(direction, FAST) == pytest.approx(expected_pan, abs=1e-6)
-
-
-def test_eastward_flow_is_right_and_westward_is_left():
-    left_e, right_e = pan_to_channel_gains(direction_to_pan(90.0, FAST))
-    left_w, right_w = pan_to_channel_gains(direction_to_pan(270.0, FAST))
-    assert right_e == pytest.approx(1.0) and left_e == pytest.approx(0.0, abs=1e-12)
-    assert left_w == pytest.approx(1.0) and right_w == pytest.approx(0.0, abs=1e-12)
-
-
-def test_north_and_south_are_centred_and_indistinguishable():
-    assert direction_to_pan(0.0, FAST) == direction_to_pan(180.0, FAST) == 0.0
-
-
-def test_undefined_direction_and_disabled_mapping_are_centred():
-    assert direction_to_pan(None, FAST) == 0.0
-    off = FAST.model_copy(update={"direction_mapping": "none"})
-    assert direction_to_pan(90.0, off) == 0.0
+# --- pan law ----------------------------------------------------------------
 
 
 def test_pan_law_is_constant_power():
@@ -170,9 +144,17 @@ def test_pan_law_is_constant_power():
     assert pan_to_channel_gains(0.0) == pytest.approx((math.sqrt(0.5), math.sqrt(0.5)))
 
 
-def test_pan_wraps_continuously_around_north():
-    assert direction_to_pan(359.0, FAST) == pytest.approx(direction_to_pan(-1.0 % 360, FAST))
-    assert abs(direction_to_pan(359.0, FAST) - direction_to_pan(1.0, FAST)) < 0.04
+def test_pan_extremes_are_single_channel():
+    left_r, right_r = pan_to_channel_gains(1.0)
+    left_l, right_l = pan_to_channel_gains(-1.0)
+    assert right_r == pytest.approx(1.0) and left_r == pytest.approx(0.0, abs=1e-12)
+    assert left_l == pytest.approx(1.0) and right_l == pytest.approx(0.0, abs=1e-12)
+
+
+@pytest.mark.parametrize("bad", [-1.01, 1.01, math.nan])
+def test_pan_outside_range_is_rejected(bad):
+    with pytest.raises(SonificationError):
+        pan_to_channel_gains(bad)
 
 
 # --- timeline / rhythm ------------------------------------------------------
@@ -208,6 +190,108 @@ def test_carrier_peak_never_exceeds_one_and_is_phase_continuous():
     assert np.array_equal(wave_full[8000:], carrier_waveform(16000, FAST)[8000:])
 
 
+def test_timing_reports_pulse_rate_and_flags_a_cadence_too_fast_to_hear():
+    dense = render_soundscape(make_series([sample(i) for i in range(30)]), FAST).provenance.timing
+    assert dense.segment_count == 30 and dense.pulse_rate_hz_mean == 30.0
+    # 30 pulses in 1 s is above the floor; the same 30 over 30 s is not.
+    assert not dense.heard_as_rhythm and dense.rhythm_floor_hz == RHYTHM_FLOOR_HZ
+    comfortable = render_soundscape(
+        make_series([sample(i) for i in range(30)]), SonificationSettings(duration_seconds=30.0)
+    ).provenance.timing
+    assert comfortable.pulse_rate_hz_mean == 1.0 and comfortable.heard_as_rhythm
+
+
+def test_timing_segment_lengths_are_reported_in_seconds():
+    timing = describe_timing(plan_segments([sample(i) for i in range(3)], FAST), FAST)
+    assert timing.segment_seconds_min == pytest.approx(1 / 3, abs=1 / 8000)
+    assert timing.segment_seconds_max == pytest.approx(1 / 3, abs=1 / 8000)
+
+
+# --- rate-driven rhythm -----------------------------------------------------
+
+
+def test_a_series_without_rates_is_laid_out_uniformly():
+    """Unknown rates must not warp the timeline, so the default stays safe."""
+    samples = [sample(i, rate=None) for i in range(7)]
+    weighted = plan_segments(samples, FAST)
+    uniform = plan_segments(samples, FAST.model_copy(update={"timing_mode": "uniform"}))
+    assert [s.start_frame for s in weighted] == [s.start_frame for s in uniform]
+
+
+def test_rapid_change_shortens_its_segment_and_calm_lengthens_it():
+    samples = [sample(0, rate=0.0), sample(1, rate=1.0), sample(2, rate=0.0)]
+    segments = plan_segments(samples, FAST)
+    lengths = [s.end_frame - s.start_frame for s in segments]
+    assert lengths[1] < lengths[0] and lengths[1] < lengths[2]
+    # 1 / (1 + 1.5 * 1) = 0.4 of a static sample's share.
+    assert lengths[1] / lengths[0] == pytest.approx(0.4, rel=0.01)
+    assert sum(lengths) == 8000  # the duration is unchanged, only its distribution
+
+
+def test_pulse_rate_rises_monotonically_with_the_rate_of_change():
+    rates = [0.0, 0.25, 0.5, 0.75, 1.0]
+    segments = plan_segments([sample(i, rate=r) for i, r in enumerate(rates)], FAST)
+    lengths = [s.end_frame - s.start_frame for s in segments]
+    assert all(a > b for a, b in itertools.pairwise(lengths))
+
+
+def test_higher_sensitivity_gives_more_tempo_contrast():
+    samples = [sample(0, rate=0.0), sample(1, rate=1.0)]
+
+    def spread(sensitivity):
+        segments = plan_segments(samples, FAST.model_copy(update={"rate_sensitivity": sensitivity}))
+        lengths = [s.end_frame - s.start_frame for s in segments]
+        return max(lengths) / min(lengths)
+
+    assert spread(0.5) < spread(1.5) < spread(4.0)
+
+
+def test_rate_weighted_timing_covers_every_frame_exactly_once():
+    samples = [sample(i, rate=(i % 5) / 4) for i in range(40)]
+    segments = plan_segments(samples, FAST)
+    assert segments[0].start_frame == 0 and segments[-1].end_frame == 8000
+    for previous, current in itertools.pairwise(segments):
+        assert previous.end_frame == current.start_frame
+    assert all(s.end_frame > s.start_frame for s in segments)
+
+
+def test_timing_records_the_mode_and_that_the_axis_is_not_linear():
+    samples = [sample(i, rate=(i % 2) * 1.0) for i in range(10)]
+    weighted = render_soundscape(make_series(samples), FAST).provenance.timing
+    assert weighted.timing_mode == "rate_weighted" and weighted.rate_sensitivity == 1.5
+    assert not weighted.linear_time_axis
+    assert weighted.segment_seconds_min < weighted.segment_seconds_max
+    assert weighted.pulse_rate_hz_max > weighted.pulse_rate_hz_mean
+
+    uniform = render_soundscape(
+        make_series(samples), FAST.model_copy(update={"timing_mode": "uniform"})
+    ).provenance.timing
+    assert uniform.timing_mode == "uniform" and uniform.linear_time_axis
+    assert uniform.segment_seconds_min == pytest.approx(uniform.segment_seconds_max, abs=1 / 8000)
+
+
+def test_rate_weighting_refuses_a_layout_that_would_lose_a_segment():
+    # 10 frames, 9 samples, one of them demanding a much shorter share than the rest.
+    samples = [sample(0, rate=1.0), *(sample(i, rate=0.0) for i in range(1, 9))]
+    tiny = SonificationSettings(duration_seconds=10 / 8000, sample_rate_hz=8000, rate_sensitivity=50.0)
+    with pytest.raises(SonificationError, match="Rate weighting left segment"):
+        plan_segments(samples, tiny)
+
+
+def test_rate_weighting_is_deterministic():
+    samples = [sample(i, rate=(i * 7 % 11) / 10) for i in range(25)]
+    first = render_soundscape(make_series(samples), FAST)
+    second = render_soundscape(make_series(samples), FAST)
+    assert first.wav_bytes == second.wav_bytes
+    assert first.provenance.model_dump_json() == second.provenance.model_dump_json()
+
+
+def test_rate_is_recorded_on_every_segment():
+    samples = [sample(0, rate=0.75), sample(1, audible=False, status="missing"), sample(2, rate=0.0)]
+    segments = render_soundscape(make_series(samples), FAST).provenance.segments
+    assert [s.rate_normalized for s in segments] == [0.75, None, 0.0]
+
+
 # --- encoding ----------------------------------------------------------------
 
 
@@ -227,18 +311,48 @@ def test_encode_and_describe_round_trip():
     assert len(out.sha256) == 64
 
 
+# --- series validation -------------------------------------------------------
+
+
+def test_audible_sample_must_carry_a_level():
+    with pytest.raises(ValueError, match="must carry a level"):
+        SonifiableSample(timestamp=T0, audible=True, status="valid")
+
+
+def test_silent_sample_must_not_carry_a_level_or_pan():
+    with pytest.raises(ValueError, match="must not carry"):
+        SonifiableSample(timestamp=T0, audible=False, status="missing", level_normalized=0.5)
+    with pytest.raises(ValueError, match="must not carry"):
+        SonifiableSample(timestamp=T0, audible=False, status="missing", pan=0.5)
+
+
+@pytest.mark.parametrize(
+    ("field", "bad"),
+    [("level_normalized", 1.5), ("level_normalized", -0.1), ("pan", 1.5), ("pan", -1.5)],
+)
+def test_sample_rejects_out_of_range_values(field, bad):
+    fields = {"level_normalized": 0.5, field: bad}
+    with pytest.raises(ValueError):
+        SonifiableSample(timestamp=T0, audible=True, status="valid", **fields)
+
+
 # --- rendering ---------------------------------------------------------------
 
 
 def test_render_rejects_empty_or_fully_silent_series():
     with pytest.raises(SonificationError, match="empty"):
         render_soundscape(make_series([]), FAST)
-    with pytest.raises(SonificationError, match="no usable"):
-        render_soundscape(make_series([sample(0, status=SampleStatus.MISSING)]), FAST)
+    with pytest.raises(SonificationError, match="every sample is silent"):
+        render_soundscape(make_series([sample(0, audible=False, status="missing")]), FAST)
+
+
+def test_render_rejects_an_unknown_series_type():
+    with pytest.raises(SonificationError, match="Cannot sonify"):
+        render_soundscape({"not": "a series"}, FAST)
 
 
 def test_render_is_byte_identical_for_identical_input_and_settings():
-    series = make_series([sample(i, speed=0.1 * (i + 1), direction=30.0 * i) for i in range(10)])
+    series = make_series([sample(i, level=0.1 * (i + 1), pan=-1 + 0.2 * i) for i in range(10)])
     first = render_soundscape(series, FAST)
     second = render_soundscape(series, FAST)
     assert first.wav_bytes == second.wav_bytes
@@ -247,15 +361,14 @@ def test_render_is_byte_identical_for_identical_input_and_settings():
 
 
 def test_render_changes_when_settings_change():
-    series = make_series([sample(i, speed=0.5, direction=90.0) for i in range(5)])
+    series = make_series([sample(i) for i in range(5)])
     a = render_soundscape(series, FAST)
     b = render_soundscape(series, FAST.model_copy(update={"carrier_frequency_hz": 330.0}))
     assert a.wav_bytes != b.wav_bytes
 
 
 def test_output_duration_and_format_are_recorded_and_exact():
-    series = make_series([sample(i, speed=0.5, direction=90.0) for i in range(7)])
-    rendered = render_soundscape(series, FAST)
+    rendered = render_soundscape(make_series([sample(i) for i in range(7)]), FAST)
     out = rendered.provenance.output
     assert out.frames == 8000 and out.duration_seconds == 1.0
     assert (out.sample_rate_hz, out.channels, out.bit_depth) == (8000, 2, 16)
@@ -265,8 +378,7 @@ def test_output_duration_and_format_are_recorded_and_exact():
 
 
 def test_default_settings_produce_a_thirty_second_stereo_file():
-    series = make_series([sample(i, speed=0.3, direction=45.0) for i in range(30)])
-    rendered = render_soundscape(series, SonificationSettings())
+    rendered = render_soundscape(make_series([sample(i) for i in range(30)]), SonificationSettings())
     out = rendered.provenance.output
     assert out.duration_seconds == 30.0 and out.sample_rate_hz == 44100 and out.channels == 2
     assert out.byte_count == 44 + 30 * 44100 * 2 * 2
@@ -274,113 +386,129 @@ def test_default_settings_produce_a_thirty_second_stereo_file():
     assert rendered.provenance.segments[1].start_seconds == pytest.approx(1.0)
 
 
-def test_missing_and_invalid_segments_are_digital_silence():
+def test_inaudible_segments_are_digital_silence():
     series = make_series(
         [
-            sample(0, speed=1.0, direction=90.0),
-            sample(1, status=SampleStatus.MISSING),
-            sample(2, status=SampleStatus.INVALID),
-            sample(3, speed=1.0, direction=90.0),
+            sample(0, level=1.0),
+            sample(1, audible=False, status="missing"),
+            sample(2, audible=False, status="invalid"),
+            sample(3, level=1.0),
         ]
     )
     rendered = render_soundscape(series, FAST)
     frames, _ = decode(rendered.wav_bytes)
     segments = rendered.provenance.segments
     for seg in segments[1:3]:
-        assert not seg.audible and seg.gain_db is None and seg.pan is None
+        assert not seg.audible and seg.gain_db is None and seg.pan is None and seg.level_normalized is None
         assert np.all(frames[seg.start_frame : seg.end_frame] == 0)
     for seg in (segments[0], segments[3]):
         assert seg.audible and np.abs(frames[seg.start_frame : seg.end_frame]).max() > 0
 
 
-def test_zero_speed_is_quiet_but_audible_unlike_silence():
-    series = make_series(
-        [sample(0, speed=0.0, status=SampleStatus.UNDEFINED_DIRECTION), sample(1, status=SampleStatus.MISSING)]
-    )
+def test_a_level_of_zero_is_quiet_but_audible_unlike_silence():
+    series = make_series([sample(0, level=0.0), sample(1, audible=False, status="missing")])
     rendered = render_soundscape(series, FAST)
     frames, _ = decode(rendered.wav_bytes)
-    zero_speed, gap = rendered.provenance.segments
-    assert zero_speed.gain_db == -36.0 and zero_speed.pan == 0.0
-    assert np.abs(frames[zero_speed.start_frame : zero_speed.end_frame]).max() > 0
+    floor, gap = rendered.provenance.segments
+    assert floor.gain_db == -36.0 and floor.audible
+    assert np.abs(frames[floor.start_frame : floor.end_frame]).max() > 0
     assert np.all(frames[gap.start_frame : gap.end_frame] == 0)
 
 
-def test_louder_speed_gives_larger_peak_and_clipped_speed_hits_full_gain():
-    series = make_series(
-        [
-            sample(0, speed=0.25, direction=0.0),
-            sample(1, speed=2.5, direction=0.0),
-            sample(2, speed=2.5, direction=0.0, flags=(SampleFlag.CLIPPED_HIGH,)),
-        ]
-    )
+def test_higher_level_gives_a_larger_peak_and_full_level_hits_zero_db():
+    series = make_series([sample(0, level=0.1), sample(1, level=1.0)])
     rendered = render_soundscape(series, FAST)
     frames, _ = decode(rendered.wav_bytes)
     peaks = [np.abs(frames[s.start_frame : s.end_frame]).max() for s in rendered.provenance.segments]
     assert peaks[0] < peaks[1]
-    assert rendered.provenance.segments[1].gain_db == 0.0 == rendered.provenance.segments[2].gain_db
-    # Centre pan at 0 dB: each channel carries peak_amplitude / sqrt(2) of the carrier's own peak
-    # (the harmonics never peak together, so the normalized carrier peaks below 1).
-    seg = rendered.provenance.segments[1]
-    carrier_peak = np.abs(carrier_waveform(8000, FAST)[seg.start_frame : seg.end_frame]).max()
-    expected_peak = 0.9 * math.sqrt(0.5) * carrier_peak * PCM16_FULL_SCALE
-    assert peaks[1] == pytest.approx(expected_peak, rel=0.02)
-    assert rendered.provenance.segments[2].flags == [SampleFlag.CLIPPED_HIGH]
+    loud = rendered.provenance.segments[1]
+    assert loud.gain_db == 0.0
+    # Centre pan at 0 dB: each channel carries peak_amplitude / sqrt(2) of the carrier's own
+    # peak (the harmonics never align, so the normalized carrier peaks below 1).
+    carrier_peak = np.abs(carrier_waveform(8000, FAST)[loud.start_frame : loud.end_frame]).max()
+    assert peaks[1] == pytest.approx(0.9 * math.sqrt(0.5) * carrier_peak * PCM16_FULL_SCALE, rel=0.02)
 
 
-def test_eastward_segment_is_right_only_and_westward_left_only():
-    series = make_series([sample(0, speed=1.0, direction=90.0), sample(1, speed=1.0, direction=270.0)])
+def test_pan_places_segments_in_the_expected_channel():
+    series = make_series([sample(0, level=1.0, pan=1.0), sample(1, level=1.0, pan=-1.0)])
     rendered = render_soundscape(series, FAST)
     frames, _ = decode(rendered.wav_bytes)
-    east, west = rendered.provenance.segments
-    assert np.all(frames[east.start_frame : east.end_frame, 0] == 0)
-    assert np.abs(frames[east.start_frame : east.end_frame, 1]).max() > 0
-    assert np.all(frames[west.start_frame : west.end_frame, 1] == 0)
-    assert np.abs(frames[west.start_frame : west.end_frame, 0]).max() > 0
+    right, left = rendered.provenance.segments
+    assert np.all(frames[right.start_frame : right.end_frame, 0] == 0)
+    assert np.abs(frames[right.start_frame : right.end_frame, 1]).max() > 0
+    assert np.all(frames[left.start_frame : left.end_frame, 1] == 0)
+    assert np.abs(frames[left.start_frame : left.end_frame, 0]).max() > 0
 
 
-def test_direction_mapping_none_keeps_channels_identical():
-    series = make_series([sample(0, speed=1.0, direction=90.0)])
-    rendered = render_soundscape(series, FAST.model_copy(update={"direction_mapping": "none"}))
+def test_pan_disabled_keeps_channels_identical():
+    series = make_series([sample(0, level=1.0, pan=1.0)])
+    rendered = render_soundscape(series, FAST.model_copy(update={"pan_enabled": False}))
+    frames, _ = decode(rendered.wav_bytes)
+    assert np.array_equal(frames[:, 0], frames[:, 1])
+    assert rendered.provenance.segments[0].pan == 0.0
+
+
+def test_an_unmapped_pan_is_centred():
+    rendered = render_soundscape(make_series([sample(0, level=1.0, pan=None)]), FAST)
     frames, _ = decode(rendered.wav_bytes)
     assert np.array_equal(frames[:, 0], frames[:, 1])
     assert rendered.provenance.segments[0].pan == 0.0
 
 
 def test_no_sample_ever_clips_at_full_scale():
-    series = make_series([sample(i, speed=2.5, direction=90.0 * i) for i in range(8)])
+    series = make_series([sample(i, level=1.0, pan=(-1) ** i) for i in range(8)])
     rendered = render_soundscape(series, SonificationSettings(duration_seconds=0.5, sample_rate_hz=8000))
     frames, _ = decode(rendered.wav_bytes)
     assert np.abs(frames).max() <= round(0.9 * PCM16_FULL_SCALE)
 
 
+# --- provenance --------------------------------------------------------------
+
+
 def test_provenance_traces_every_segment_and_records_sources():
-    series = make_series([sample(i, speed=0.5 + 0.1 * i, direction=10.0 * i) for i in range(4)])
-    rendered = render_soundscape(series, FAST)
-    prov = rendered.provenance
+    samples = [sample(i, level=0.2 * i, pan=0.1 * i, values={"thing": float(i)}) for i in range(4)]
+    series = make_series(samples)
+    prov = render_soundscape(series, FAST).provenance
     assert prov.sonification_version == SONIFICATION_VERSION
     assert prov.settings == FAST
-    assert prov.mappings == list(MAPPINGS) and prov.omitted_mappings == list(OMITTED_MAPPINGS)
-    assert prov.source.dataset == "OSCAR_L4_OC_FINAL_V2.0" and prov.source.source_sha256 == "0" * 64
-    assert prov.source.processing_version == "1.0.2" and prov.source.usable_samples == 4
+    assert prov.engine_mappings == list(ENGINE_MAPPINGS)
+    assert prov.domain_mappings == series.domain_mappings
+    assert prov.omitted_mappings == series.omitted_mappings
+    assert prov.source.domain == "test_domain" and prov.source.source_sha256 == "0" * 64
+    assert prov.source.processing_version == "9.9.9" and prov.source.audible_samples == 4
+    assert prov.source.source_url == "https://example.test/data"
+    assert prov.source.mapping_source == series.mapping_source
     assert [s.index for s in prov.segments] == [0, 1, 2, 3]
-    for seg, src in zip(prov.segments, series.samples):
-        assert seg.timestamp == src.timestamp and seg.speed_normalized == src.speed_normalized
-        assert seg.gain_db == pytest.approx(speed_to_gain_db(src.speed_normalized, FAST))
-        assert seg.pan == pytest.approx(direction_to_pan(src.direction_deg, FAST))
+    for seg, src in zip(prov.segments, samples, strict=True):
+        assert seg.timestamp == src.timestamp and seg.level_normalized == src.level_normalized
+        assert seg.gain_db == pytest.approx(level_to_gain_db(src.level_normalized, FAST))
+        assert seg.pan == pytest.approx(src.pan)
+        assert seg.source_values == src.source_values
     # Round-trips through JSON so the API (Phase 5) can serve it.
     assert SoundscapeProvenance.model_validate_json(prov.model_dump_json()) == prov
 
 
-def test_every_mapped_sound_parameter_names_a_source_measurement():
-    for rule in (*MAPPINGS, *OMITTED_MAPPINGS):
+def test_provenance_mappings_property_combines_engine_and_domain_rules():
+    prov = render_soundscape(make_series([sample(0)]), FAST).provenance
+    assert prov.mappings == [*prov.engine_mappings, *prov.domain_mappings]
+
+
+def test_engine_mappings_cover_every_sound_parameter_it_controls():
+    for rule in ENGINE_MAPPINGS:
         assert rule.sound_parameter and rule.source_measurement and rule.rule and rule.rationale
-    parameters = {rule.sound_parameter for rule in MAPPINGS}
-    assert {"loudness (gain)", "stereo position (pan)", "segment timing (rhythm)", "silence", "pitch and timbre"} <= parameters
-    assert any("temperature" in rule.sound_parameter for rule in OMITTED_MAPPINGS)
+    parameters = {rule.sound_parameter for rule in ENGINE_MAPPINGS}
+    assert parameters == {
+        "segment order (which pulse is which sample)",
+        "segment length (pulse rate / rhythm)",
+        "loudness (gain)",
+        "silence",
+        "stereo position (pan)",
+        "pitch and timbre",
+    }
 
 
 def test_plan_segments_matches_render_without_audio():
-    series = make_series([sample(i, speed=0.4, direction=120.0) for i in range(3)])
+    series = make_series([sample(i) for i in range(3)])
     assert plan_segments(series.samples, FAST) == render_soundscape(series, FAST).provenance.segments
 
 

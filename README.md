@@ -59,20 +59,44 @@ series = process_current_series(extract_default_series("data/raw/.../sample.nc")
 print(series.model_dump_json(indent=2))
 ```
 
-## Sonification
+## COVID-19 dataset
 
-Phase 4 renders a processed series into a reproducible, exactly 30-second stereo WAV (44.1 kHz, 16-bit) with no extra audio dependencies. Each sample of the series becomes one pulse of a fixed 220 Hz tone (one per day for the OSCAR sample): current speed sets loudness through `speed_normalized` (−36 dB at 0, 0 dB at 2.5 m s⁻¹), the east–west component of direction pans the pulse (eastward = right, westward = left; north–south is not rendered), and missing or invalid samples are digital silence. Nothing is random, so identical input and settings give byte-identical output. Temperature is not mapped because the dataset has no temperature variable. Every rule, its rationale and the omitted mappings are in [`docs/sonification-mapping.md`](docs/sonification-mapping.md) and are embedded in each output's provenance JSON.
+Phase 4b adds a second, far more rapidly changing dataset: Our World In Data's WHO-compiled COVID-19 deaths and cases. It needs no credentials.
+
+Its `new_deaths` and `new_cases` columns look daily but are **weekly**: the whole week's total is posted on Sunday and the other six days are zero. The processing layer detects that cadence from the rows rather than assuming it, and aggregates to calendar weeks, so non-reporting days are never rendered as reports of zero. The source, the verified facts and the cited normalization reference are in [`docs/covid-dataset-decision.md`](docs/covid-dataset-decision.md).
 
 ```powershell
-python scripts/render_soundscape.py data\raw\oscar-final-20200101-20200130\oscar-final-20200101-20200130.nc --mode point --provenance-copy data\metadata
+python scripts/fetch_covid_sample.py
+python scripts/fetch_covid_sample.py --location Italy --location World
 ```
 
-This writes `data/processed/<sample>.point.wav` and `<sample>.point.soundscape.json`. The provenance of the reference renders is committed under `data/metadata/`.
+The fetcher streams the 20 MB published table, records the SHA-256 of the exact published artifact, and writes only the requested locations' rows under the Git-ignored `data/raw/`.
+
+## Sonification
+
+The engine renders any validated series into a reproducible, exactly 30-second stereo WAV (44.1 kHz, 16-bit) with no extra audio dependencies. Each sample becomes one pulse of a fixed 220 Hz tone, loudness comes from a normalized level, stereo position carries a second variable, and samples with no usable data are digital silence. Nothing is random, so identical input and settings give byte-identical output. Pitch never varies, because no dataset here has a variable mapped to it.
+
+Each data domain supplies its own documented mapping, and both the engine's rules and the domain's rules are embedded in every output's provenance JSON:
+
+| Domain | Loudness | Stereo position | Pulse |
+|---|---|---|---|
+| Ocean currents | speed vs. 0–2.5 m s⁻¹ | east–west component of direction (east = right) | one per day |
+| COVID-19 | `log10(weekly count)` vs. a cited 10⁵ deaths/week ceiling | week-over-week growth (doubling = hard right) | one per week |
+
+The COVID render uses the full −36 to 0 dB range across 240 weeks at 8 pulses/second; the OSCAR render spans about 10 dB across 30 days. Every rule, its rationale, the omitted mappings and the reference render hashes are in [`docs/sonification-mapping.md`](docs/sonification-mapping.md).
+
+```powershell
+python scripts/render_soundscape.py covid data\raw\owid-covid-weekly\owid-covid-weekly.csv --provenance-copy data\metadata
+python scripts/render_soundscape.py ocean data\raw\oscar-final-20200101-20200130\oscar-final-20200101-20200130.nc --mode point --provenance-copy data\metadata
+```
+
+This writes `data/processed/<stem>.wav` and `<stem>.soundscape.json`. The provenance of the reference renders is committed under `data/metadata/`.
 
 ```python
 from app.services.sonification import render_soundscape
 
-rendered = render_soundscape(series)          # series: ProcessedCurrentSeries from Phase 3
+rendered = render_soundscape(series)   # a ProcessedCurrentSeries, a ProcessedCaseSeries,
+                                       # or any SonifiableSeries
 open("soundscape.wav", "wb").write(rendered.wav_bytes)
 print(rendered.provenance.model_dump_json(indent=2))
 ```

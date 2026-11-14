@@ -35,6 +35,14 @@ class Settings(BaseSettings):
     soundscape_duration_seconds: float = Field(default=30.0, gt=0)
     soundscape_sample_rate_hz: int = Field(default=44100, ge=8000)
 
+    # Phase 4b COVID-19 series defaults. "World" is the default location because
+    # it is the Earth-scale series and avoids singling out one country; deaths is
+    # the default metric because reported cases track testing capacity far more
+    # strongly. See docs/covid-dataset-decision.md.
+    covid_location: str = "World"
+    covid_metric: Literal["deaths", "cases"] = "deaths"
+    covid_minimum_usable_samples: int = Field(default=10, ge=1)
+
     model_config = SettingsConfigDict(
         env_prefix="EARTH_JUKEBOX_",
         env_file=".env",
