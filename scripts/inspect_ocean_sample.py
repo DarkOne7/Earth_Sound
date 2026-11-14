@@ -13,6 +13,18 @@ import numpy as np
 import xarray as xr
 
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _portable_path(path: Path) -> str:
+    """Repo-relative POSIX path when possible, so committed reports carry no machine paths."""
+    resolved = path.resolve()
+    try:
+        return resolved.relative_to(REPO_ROOT).as_posix()
+    except ValueError:
+        return str(resolved)
+
+
 def _plain(value: Any) -> Any:
     if isinstance(value, dict):
         return {str(key): _plain(item) for key, item in value.items()}
@@ -116,14 +128,64 @@ def _time_summary(dataset: xr.Dataset) -> dict[str, Any] | None:
     return result
 
 
+_AXIS_UNITS = {
+    "latitude": {"degrees_north", "degree_north", "degree_n", "degrees_n"},
+    "longitude": {"degrees_east", "degree_east", "degree_e", "degrees_e"},
+}
+_AXIS_LETTERS = {"latitude": "Y", "longitude": "X", "time": "T"}
+
+
+def _coordinate_axis(variable: xr.DataArray) -> str | None:
+    """CF axis ('latitude', 'longitude' or 'time') of a 1-D variable, from its attributes."""
+    attrs = variable.attrs
+    standard_name = str(attrs.get("standard_name", "")).strip().lower()
+    units = str(attrs.get("units", "")).strip().lower().replace(" ", "_")
+    axis = str(attrs.get("axis", "")).strip().upper()
+    for name in ("latitude", "longitude", "time"):
+        if standard_name == name or units in _AXIS_UNITS.get(name, set()) or axis == _AXIS_LETTERS[name]:
+            return name
+    return None
+
+
+def _coordinate_variables(dataset: xr.Dataset) -> dict[str, xr.DataArray]:
+    """xarray coordinates plus 1-D CF coordinate variables.
+
+    With ``decode_cf=False`` variables attached only through a ``coordinates``
+    attribute (e.g. OSCAR's ``lat(latitude)``/``lon(longitude)``) are data variables.
+    """
+    found = {str(name): coordinate for name, coordinate in dataset.coords.items()}
+    for name, variable in dataset.data_vars.items():
+        if variable.ndim == 1 and _coordinate_axis(variable):
+            found[str(name)] = variable
+    return found
+
+
+def _decoded_numeric(variable: xr.DataArray) -> np.ndarray:
+    """Values with fill/missing values removed and CF scale_factor/add_offset applied."""
+    values = np.asarray(variable.values)
+    if not (values.size and np.issubdtype(values.dtype, np.number)):
+        return values
+    values = values.astype(float)
+    attrs = variable.attrs
+    for key in ("_FillValue", "missing_value"):
+        if key in attrs:
+            for fill in np.atleast_1d(np.asarray(attrs[key], dtype=float)):
+                values = np.where(values == fill, np.nan, values)
+    try:
+        values = values * float(attrs.get("scale_factor", 1.0)) + float(attrs.get("add_offset", 0.0))
+    except (TypeError, ValueError):
+        pass
+    return values
+
+
 def _coordinate_summary(dataset: xr.Dataset) -> dict[str, Any]:
     summary: dict[str, Any] = {}
-    for name, coordinate in dataset.coords.items():
-        values = np.asarray(coordinate.values)
+    for name, coordinate in _coordinate_variables(dataset).items():
+        values = _decoded_numeric(coordinate)
         item: dict[str, Any] = {
             "units": _plain(coordinate.attrs.get("units")),
             "standard_name": _plain(coordinate.attrs.get("standard_name")),
-            "dtype": str(values.dtype),
+            "dtype": str(coordinate.dtype),
             "shape": list(values.shape),
             "minimum": None,
             "maximum": None,
@@ -134,8 +196,8 @@ def _coordinate_summary(dataset: xr.Dataset) -> dict[str, Any]:
             if finite.size:
                 item["minimum"] = float(np.min(finite))
                 item["maximum"] = float(np.max(finite))
-            if values.ndim == 1 and values.size > 1:
-                differences = np.abs(np.diff(np.sort(np.unique(values.astype(float)))))
+            if values.ndim == 1 and finite.size > 1:
+                differences = np.abs(np.diff(np.sort(np.unique(finite))))
                 differences = differences[differences > 0]
                 if differences.size:
                     item["resolution_degrees"] = float(np.median(differences))
@@ -144,15 +206,14 @@ def _coordinate_summary(dataset: xr.Dataset) -> dict[str, Any]:
 
 
 def _find_coordinate(dataset: xr.Dataset, axis: str) -> str | None:
-    aliases = {
-        "latitude": {"lat", "latitude"},
-        "longitude": {"lon", "longitude"},
-    }
-    for name, coordinate in dataset.coords.items():
-        if (
-            str(coordinate.attrs.get("standard_name", "")).lower() == axis
-            or name.lower() in aliases.get(axis, set())
-        ):
+    """Coordinate for ``axis``: CF attributes first, then conventional names."""
+    candidates = _coordinate_variables(dataset)
+    for name, coordinate in candidates.items():
+        if _coordinate_axis(coordinate) == axis:
+            return name
+    aliases = {"latitude": {"lat", "latitude"}, "longitude": {"lon", "longitude"}}
+    for name in candidates:
+        if name.lower() in aliases.get(axis, set()):
             return name
     return None
 
@@ -262,7 +323,7 @@ def inspect_netcdf(path: Path) -> dict[str, Any]:
             if any(token in name.lower() for token in ("mask", "land", "ice"))
         ]
         summary = {
-            "file": str(path.resolve()),
+            "file": _portable_path(path),
             "dimensions": {name: int(size) for name, size in dataset.sizes.items()},
             "coordinates": coordinates,
             "latitude_coordinate": latitude_name,

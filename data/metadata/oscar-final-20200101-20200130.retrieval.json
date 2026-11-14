@@ -1,0 +1,494 @@
+{
+  "retrieved_at_utc": "2026-11-14T09:33:03.786674+00:00",
+  "provider": "NASA PO.DAAC",
+  "cmr_collection_id": "C2098858642-POCLOUD",
+  "cmr_granules": [
+    {
+      "name": "oscar_currents_final_20200101",
+      "time_start": "2020-01-01T00:00:00.000Z",
+      "time_end": "2020-01-01T23:59:59.000Z",
+      "size_mb": 31.714913368225094
+    },
+    {
+      "name": "oscar_currents_final_20200102",
+      "time_start": "2020-01-02T00:00:00.000Z",
+      "time_end": "2020-01-02T23:59:59.000Z",
+      "size_mb": 31.714913368225094
+    },
+    {
+      "name": "oscar_currents_final_20200103",
+      "time_start": "2020-01-03T00:00:00.000Z",
+      "time_end": "2020-01-03T23:59:59.000Z",
+      "size_mb": 31.714913368225094
+    },
+    {
+      "name": "oscar_currents_final_20200104",
+      "time_start": "2020-01-04T00:00:00.000Z",
+      "time_end": "2020-01-04T23:59:59.000Z",
+      "size_mb": 31.714913368225094
+    },
+    {
+      "name": "oscar_currents_final_20200105",
+      "time_start": "2020-01-05T00:00:00.000Z",
+      "time_end": "2020-01-05T23:59:59.000Z",
+      "size_mb": 31.714913368225094
+    },
+    {
+      "name": "oscar_currents_final_20200106",
+      "time_start": "2020-01-06T00:00:00.000Z",
+      "time_end": "2020-01-06T23:59:59.000Z",
+      "size_mb": 31.714913368225094
+    },
+    {
+      "name": "oscar_currents_final_20200107",
+      "time_start": "2020-01-07T00:00:00.000Z",
+      "time_end": "2020-01-07T23:59:59.000Z",
+      "size_mb": 31.714913368225094
+    },
+    {
+      "name": "oscar_currents_final_20200108",
+      "time_start": "2020-01-08T00:00:00.000Z",
+      "time_end": "2020-01-08T23:59:59.000Z",
+      "size_mb": 31.714913368225094
+    },
+    {
+      "name": "oscar_currents_final_20200109",
+      "time_start": "2020-01-09T00:00:00.000Z",
+      "time_end": "2020-01-09T23:59:59.000Z",
+      "size_mb": 31.714913368225094
+    },
+    {
+      "name": "oscar_currents_final_20200110",
+      "time_start": "2020-01-10T00:00:00.000Z",
+      "time_end": "2020-01-10T23:59:59.000Z",
+      "size_mb": 31.714913368225094
+    },
+    {
+      "name": "oscar_currents_final_20200111",
+      "time_start": "2020-01-11T00:00:00.000Z",
+      "time_end": "2020-01-11T23:59:59.000Z",
+      "size_mb": 31.714913368225094
+    },
+    {
+      "name": "oscar_currents_final_20200112",
+      "time_start": "2020-01-12T00:00:00.000Z",
+      "time_end": "2020-01-12T23:59:59.000Z",
+      "size_mb": 31.714913368225094
+    },
+    {
+      "name": "oscar_currents_final_20200113",
+      "time_start": "2020-01-13T00:00:00.000Z",
+      "time_end": "2020-01-13T23:59:59.000Z",
+      "size_mb": 31.714913368225094
+    },
+    {
+      "name": "oscar_currents_final_20200114",
+      "time_start": "2020-01-14T00:00:00.000Z",
+      "time_end": "2020-01-14T23:59:59.000Z",
+      "size_mb": 31.714913368225094
+    },
+    {
+      "name": "oscar_currents_final_20200115",
+      "time_start": "2020-01-15T00:00:00.000Z",
+      "time_end": "2020-01-15T23:59:59.000Z",
+      "size_mb": 31.714913368225094
+    },
+    {
+      "name": "oscar_currents_final_20200116",
+      "time_start": "2020-01-16T00:00:00.000Z",
+      "time_end": "2020-01-16T23:59:59.000Z",
+      "size_mb": 31.714913368225094
+    },
+    {
+      "name": "oscar_currents_final_20200117",
+      "time_start": "2020-01-17T00:00:00.000Z",
+      "time_end": "2020-01-17T23:59:59.000Z",
+      "size_mb": 31.714913368225094
+    },
+    {
+      "name": "oscar_currents_final_20200118",
+      "time_start": "2020-01-18T00:00:00.000Z",
+      "time_end": "2020-01-18T23:59:59.000Z",
+      "size_mb": 31.714913368225094
+    },
+    {
+      "name": "oscar_currents_final_20200119",
+      "time_start": "2020-01-19T00:00:00.000Z",
+      "time_end": "2020-01-19T23:59:59.000Z",
+      "size_mb": 31.714913368225094
+    },
+    {
+      "name": "oscar_currents_final_20200120",
+      "time_start": "2020-01-20T00:00:00.000Z",
+      "time_end": "2020-01-20T23:59:59.000Z",
+      "size_mb": 31.714913368225094
+    },
+    {
+      "name": "oscar_currents_final_20200121",
+      "time_start": "2020-01-21T00:00:00.000Z",
+      "time_end": "2020-01-21T23:59:59.000Z",
+      "size_mb": 31.714913368225094
+    },
+    {
+      "name": "oscar_currents_final_20200122",
+      "time_start": "2020-01-22T00:00:00.000Z",
+      "time_end": "2020-01-22T23:59:59.000Z",
+      "size_mb": 31.714913368225094
+    },
+    {
+      "name": "oscar_currents_final_20200123",
+      "time_start": "2020-01-23T00:00:00.000Z",
+      "time_end": "2020-01-23T23:59:59.000Z",
+      "size_mb": 31.714913368225094
+    },
+    {
+      "name": "oscar_currents_final_20200124",
+      "time_start": "2020-01-24T00:00:00.000Z",
+      "time_end": "2020-01-24T23:59:59.000Z",
+      "size_mb": 31.714913368225094
+    },
+    {
+      "name": "oscar_currents_final_20200125",
+      "time_start": "2020-01-25T00:00:00.000Z",
+      "time_end": "2020-01-25T23:59:59.000Z",
+      "size_mb": 31.714913368225094
+    },
+    {
+      "name": "oscar_currents_final_20200126",
+      "time_start": "2020-01-26T00:00:00.000Z",
+      "time_end": "2020-01-26T23:59:59.000Z",
+      "size_mb": 31.714913368225094
+    },
+    {
+      "name": "oscar_currents_final_20200127",
+      "time_start": "2020-01-27T00:00:00.000Z",
+      "time_end": "2020-01-27T23:59:59.000Z",
+      "size_mb": 31.714913368225094
+    },
+    {
+      "name": "oscar_currents_final_20200128",
+      "time_start": "2020-01-28T00:00:00.000Z",
+      "time_end": "2020-01-28T23:59:59.000Z",
+      "size_mb": 31.714913368225094
+    },
+    {
+      "name": "oscar_currents_final_20200129",
+      "time_start": "2020-01-29T00:00:00.000Z",
+      "time_end": "2020-01-29T23:59:59.000Z",
+      "size_mb": 31.714913368225094
+    },
+    {
+      "name": "oscar_currents_final_20200130",
+      "time_start": "2020-01-30T00:00:00.000Z",
+      "time_end": "2020-01-30T23:59:59.000Z",
+      "size_mb": 31.714913368225094
+    }
+  ],
+  "catalog_full_granules_total_mb": 951.4474010467528,
+  "selection": {
+    "collection": "OSCAR_L4_OC_FINAL_V2.0",
+    "version": "2.0",
+    "collection_concept_id": "C2098858642-POCLOUD",
+    "granules": [
+      "oscar_currents_final_20200101",
+      "oscar_currents_final_20200102",
+      "oscar_currents_final_20200103",
+      "oscar_currents_final_20200104",
+      "oscar_currents_final_20200105",
+      "oscar_currents_final_20200106",
+      "oscar_currents_final_20200107",
+      "oscar_currents_final_20200108",
+      "oscar_currents_final_20200109",
+      "oscar_currents_final_20200110",
+      "oscar_currents_final_20200111",
+      "oscar_currents_final_20200112",
+      "oscar_currents_final_20200113",
+      "oscar_currents_final_20200114",
+      "oscar_currents_final_20200115",
+      "oscar_currents_final_20200116",
+      "oscar_currents_final_20200117",
+      "oscar_currents_final_20200118",
+      "oscar_currents_final_20200119",
+      "oscar_currents_final_20200120",
+      "oscar_currents_final_20200121",
+      "oscar_currents_final_20200122",
+      "oscar_currents_final_20200123",
+      "oscar_currents_final_20200124",
+      "oscar_currents_final_20200125",
+      "oscar_currents_final_20200126",
+      "oscar_currents_final_20200127",
+      "oscar_currents_final_20200128",
+      "oscar_currents_final_20200129",
+      "oscar_currents_final_20200130"
+    ],
+    "start_date": "2020-01-01",
+    "end_date": "2020-01-30",
+    "bbox_wgs84": [
+      -152.0,
+      0.0,
+      -150.0,
+      2.0
+    ],
+    "access": "opendap",
+    "variables": [
+      "u",
+      "v"
+    ],
+    "output_dir": "data/raw/oscar-final-20200101-20200130",
+    "max_bytes": 26214400,
+    "allow_large": false
+  },
+  "access_method": "PO.DAAC Cloud OPeNDAP (Hyrax) DAP4 index subsetting",
+  "opendap_constraint": "/u[0:0][832:840][359:367];/v[0:0][832:840][359:367];/lat[359:367];/lon[832:840];/time",
+  "grid_layout": {
+    "latitude_variable": "lat",
+    "longitude_variable": "lon",
+    "time_variable": "time",
+    "latitude_dimension": "latitude",
+    "longitude_dimension": "longitude",
+    "source": "DAP4 DMR of https://opendap.earthdata.nasa.gov/collections/C2098858642-POCLOUD/granules/oscar_currents_final_20200101"
+  },
+  "index_ranges": {
+    "latitude": [
+      359,
+      367
+    ],
+    "longitude": [
+      832,
+      840
+    ],
+    "latitude_values": [
+      0.0,
+      2.0
+    ],
+    "longitude_values": [
+      208.0,
+      210.0
+    ],
+    "native_longitude_bounds": [
+      208.0,
+      210.0
+    ]
+  },
+  "python_version": "3.15.0",
+  "requests_version": "2.34.2",
+  "outputs": [
+    {
+      "path": "data/raw/oscar-final-20200101-20200130/oscar_currents_final_20200101.subset.nc4",
+      "bytes": 44259,
+      "sha256": "90ba729013e0c59e10793cf4729f2ac9946280be184994e82d2a954869b4dc6b",
+      "role": "granule",
+      "source_url": "https://opendap.earthdata.nasa.gov/collections/C2098858642-POCLOUD/granules/oscar_currents_final_20200101"
+    },
+    {
+      "path": "data/raw/oscar-final-20200101-20200130/oscar_currents_final_20200102.subset.nc4",
+      "bytes": 44257,
+      "sha256": "44e971e24cda66bcdb3c2b359e2d46cc7f9df7b29a4f98a7c444c8f3de124e92",
+      "role": "granule",
+      "source_url": "https://opendap.earthdata.nasa.gov/collections/C2098858642-POCLOUD/granules/oscar_currents_final_20200102"
+    },
+    {
+      "path": "data/raw/oscar-final-20200101-20200130/oscar_currents_final_20200103.subset.nc4",
+      "bytes": 44259,
+      "sha256": "b11df5c62a915b93b7f3a488550626e1e9e85d27ada3baadd4ea5bcaf842db34",
+      "role": "granule",
+      "source_url": "https://opendap.earthdata.nasa.gov/collections/C2098858642-POCLOUD/granules/oscar_currents_final_20200103"
+    },
+    {
+      "path": "data/raw/oscar-final-20200101-20200130/oscar_currents_final_20200104.subset.nc4",
+      "bytes": 44257,
+      "sha256": "2b97231bfaf0e7ddd11dd166264caf6e53f46aa7d5c7e8028b687415da3a9d8b",
+      "role": "granule",
+      "source_url": "https://opendap.earthdata.nasa.gov/collections/C2098858642-POCLOUD/granules/oscar_currents_final_20200104"
+    },
+    {
+      "path": "data/raw/oscar-final-20200101-20200130/oscar_currents_final_20200105.subset.nc4",
+      "bytes": 44259,
+      "sha256": "73c19eb191e8edf2fe5af923340980ad2c530c1e77d920e03ce50ed2b2547fca",
+      "role": "granule",
+      "source_url": "https://opendap.earthdata.nasa.gov/collections/C2098858642-POCLOUD/granules/oscar_currents_final_20200105"
+    },
+    {
+      "path": "data/raw/oscar-final-20200101-20200130/oscar_currents_final_20200106.subset.nc4",
+      "bytes": 44257,
+      "sha256": "b1155809a99110ddfa04495dcbcaa4ae0d5274a9e8ad3c1f1c8647699b6ca4b8",
+      "role": "granule",
+      "source_url": "https://opendap.earthdata.nasa.gov/collections/C2098858642-POCLOUD/granules/oscar_currents_final_20200106"
+    },
+    {
+      "path": "data/raw/oscar-final-20200101-20200130/oscar_currents_final_20200107.subset.nc4",
+      "bytes": 44259,
+      "sha256": "b3638153ab6df482964d816b731a05300286e505355ad1e843c62cb493045635",
+      "role": "granule",
+      "source_url": "https://opendap.earthdata.nasa.gov/collections/C2098858642-POCLOUD/granules/oscar_currents_final_20200107"
+    },
+    {
+      "path": "data/raw/oscar-final-20200101-20200130/oscar_currents_final_20200108.subset.nc4",
+      "bytes": 44257,
+      "sha256": "b4adaaa88d816f20395217a99ae61679bbe73bf1be97274d4ec8e2b5b583e688",
+      "role": "granule",
+      "source_url": "https://opendap.earthdata.nasa.gov/collections/C2098858642-POCLOUD/granules/oscar_currents_final_20200108"
+    },
+    {
+      "path": "data/raw/oscar-final-20200101-20200130/oscar_currents_final_20200109.subset.nc4",
+      "bytes": 44257,
+      "sha256": "cb5312b4dfd6b731d37565107427e3cfcf774768ce5c4ef6058f03b100ab5e67",
+      "role": "granule",
+      "source_url": "https://opendap.earthdata.nasa.gov/collections/C2098858642-POCLOUD/granules/oscar_currents_final_20200109"
+    },
+    {
+      "path": "data/raw/oscar-final-20200101-20200130/oscar_currents_final_20200110.subset.nc4",
+      "bytes": 44257,
+      "sha256": "dc922895e0f7fdb96b36ae3d037d4ddefee52b87468803f1e29aca2ac286a0d7",
+      "role": "granule",
+      "source_url": "https://opendap.earthdata.nasa.gov/collections/C2098858642-POCLOUD/granules/oscar_currents_final_20200110"
+    },
+    {
+      "path": "data/raw/oscar-final-20200101-20200130/oscar_currents_final_20200111.subset.nc4",
+      "bytes": 44259,
+      "sha256": "b39deb880e0540f8589f46382a3ae18fa37531bb30fed924b173f9c263bac490",
+      "role": "granule",
+      "source_url": "https://opendap.earthdata.nasa.gov/collections/C2098858642-POCLOUD/granules/oscar_currents_final_20200111"
+    },
+    {
+      "path": "data/raw/oscar-final-20200101-20200130/oscar_currents_final_20200112.subset.nc4",
+      "bytes": 44257,
+      "sha256": "a48b34c6b78a345d8afeb0d7eb25fe0e84d05a62ee3182d7d3a64e82c135c77a",
+      "role": "granule",
+      "source_url": "https://opendap.earthdata.nasa.gov/collections/C2098858642-POCLOUD/granules/oscar_currents_final_20200112"
+    },
+    {
+      "path": "data/raw/oscar-final-20200101-20200130/oscar_currents_final_20200113.subset.nc4",
+      "bytes": 44259,
+      "sha256": "241e9d821ef5918cc56b7ed595c39118c30cd79c40f67dc0281182756822cbd9",
+      "role": "granule",
+      "source_url": "https://opendap.earthdata.nasa.gov/collections/C2098858642-POCLOUD/granules/oscar_currents_final_20200113"
+    },
+    {
+      "path": "data/raw/oscar-final-20200101-20200130/oscar_currents_final_20200114.subset.nc4",
+      "bytes": 44257,
+      "sha256": "42b7599702e9b3867b5df47000063b4f8cce7cc716d680b789ec8b11f8bb09ec",
+      "role": "granule",
+      "source_url": "https://opendap.earthdata.nasa.gov/collections/C2098858642-POCLOUD/granules/oscar_currents_final_20200114"
+    },
+    {
+      "path": "data/raw/oscar-final-20200101-20200130/oscar_currents_final_20200115.subset.nc4",
+      "bytes": 44259,
+      "sha256": "8e54e285791edf191b28efa2ca1a0b9e669c34aac84b973ba21a5f084df9d42d",
+      "role": "granule",
+      "source_url": "https://opendap.earthdata.nasa.gov/collections/C2098858642-POCLOUD/granules/oscar_currents_final_20200115"
+    },
+    {
+      "path": "data/raw/oscar-final-20200101-20200130/oscar_currents_final_20200116.subset.nc4",
+      "bytes": 44257,
+      "sha256": "12ce27fc0a6604dc1c4dbb66b2b54c75995e72db4b1f282af1e9d225629bca63",
+      "role": "granule",
+      "source_url": "https://opendap.earthdata.nasa.gov/collections/C2098858642-POCLOUD/granules/oscar_currents_final_20200116"
+    },
+    {
+      "path": "data/raw/oscar-final-20200101-20200130/oscar_currents_final_20200117.subset.nc4",
+      "bytes": 44259,
+      "sha256": "77f743f28ae530d44d9bb13b8bebb369eebf4e6c9e721edddf9a0d0cd61852b8",
+      "role": "granule",
+      "source_url": "https://opendap.earthdata.nasa.gov/collections/C2098858642-POCLOUD/granules/oscar_currents_final_20200117"
+    },
+    {
+      "path": "data/raw/oscar-final-20200101-20200130/oscar_currents_final_20200118.subset.nc4",
+      "bytes": 44255,
+      "sha256": "b9958f86ce6e1c792b0d947c7a87df76c1373de22130a0ef3703b8774c6c5551",
+      "role": "granule",
+      "source_url": "https://opendap.earthdata.nasa.gov/collections/C2098858642-POCLOUD/granules/oscar_currents_final_20200118"
+    },
+    {
+      "path": "data/raw/oscar-final-20200101-20200130/oscar_currents_final_20200119.subset.nc4",
+      "bytes": 44256,
+      "sha256": "881cad2e363984f175496a56aa65b4b17d22483bb7739e7d06c4d0728c286ede",
+      "role": "granule",
+      "source_url": "https://opendap.earthdata.nasa.gov/collections/C2098858642-POCLOUD/granules/oscar_currents_final_20200119"
+    },
+    {
+      "path": "data/raw/oscar-final-20200101-20200130/oscar_currents_final_20200120.subset.nc4",
+      "bytes": 44257,
+      "sha256": "330943dbbf6c610bf137137a3ce771cb619f2ed4546d2abccf84ab8bedeb74a1",
+      "role": "granule",
+      "source_url": "https://opendap.earthdata.nasa.gov/collections/C2098858642-POCLOUD/granules/oscar_currents_final_20200120"
+    },
+    {
+      "path": "data/raw/oscar-final-20200101-20200130/oscar_currents_final_20200121.subset.nc4",
+      "bytes": 44259,
+      "sha256": "6d6c313517aa41f30370f4a5735fafa0b5e0ee748f1c6f9ac219aa36b49c60aa",
+      "role": "granule",
+      "source_url": "https://opendap.earthdata.nasa.gov/collections/C2098858642-POCLOUD/granules/oscar_currents_final_20200121"
+    },
+    {
+      "path": "data/raw/oscar-final-20200101-20200130/oscar_currents_final_20200122.subset.nc4",
+      "bytes": 44257,
+      "sha256": "1fbad9cd5424f685832a21537ad667b0e9dda025e7b29b95dee30ed26864d652",
+      "role": "granule",
+      "source_url": "https://opendap.earthdata.nasa.gov/collections/C2098858642-POCLOUD/granules/oscar_currents_final_20200122"
+    },
+    {
+      "path": "data/raw/oscar-final-20200101-20200130/oscar_currents_final_20200123.subset.nc4",
+      "bytes": 44259,
+      "sha256": "3fd4d0522554a3eb66e54735cad865d3637a8f8050b8c2fc4d855d0b020dc90f",
+      "role": "granule",
+      "source_url": "https://opendap.earthdata.nasa.gov/collections/C2098858642-POCLOUD/granules/oscar_currents_final_20200123"
+    },
+    {
+      "path": "data/raw/oscar-final-20200101-20200130/oscar_currents_final_20200124.subset.nc4",
+      "bytes": 44257,
+      "sha256": "9379496c6da833c167b57e0fe0117a260f2c9bedaff002c3cfa322ee8d03d322",
+      "role": "granule",
+      "source_url": "https://opendap.earthdata.nasa.gov/collections/C2098858642-POCLOUD/granules/oscar_currents_final_20200124"
+    },
+    {
+      "path": "data/raw/oscar-final-20200101-20200130/oscar_currents_final_20200125.subset.nc4",
+      "bytes": 44259,
+      "sha256": "f4fff18f065a6f810694252b92a6575815def8695e465b7b5804aae0041ec053",
+      "role": "granule",
+      "source_url": "https://opendap.earthdata.nasa.gov/collections/C2098858642-POCLOUD/granules/oscar_currents_final_20200125"
+    },
+    {
+      "path": "data/raw/oscar-final-20200101-20200130/oscar_currents_final_20200126.subset.nc4",
+      "bytes": 44257,
+      "sha256": "15a50d0c06051f976d29fc356cf2caae995e9cc185dd6739d324a69e62380b18",
+      "role": "granule",
+      "source_url": "https://opendap.earthdata.nasa.gov/collections/C2098858642-POCLOUD/granules/oscar_currents_final_20200126"
+    },
+    {
+      "path": "data/raw/oscar-final-20200101-20200130/oscar_currents_final_20200127.subset.nc4",
+      "bytes": 44259,
+      "sha256": "76d170204ba9073ebb06186592c3ff8a2eb2312a0e957064d99db8409276f8ee",
+      "role": "granule",
+      "source_url": "https://opendap.earthdata.nasa.gov/collections/C2098858642-POCLOUD/granules/oscar_currents_final_20200127"
+    },
+    {
+      "path": "data/raw/oscar-final-20200101-20200130/oscar_currents_final_20200128.subset.nc4",
+      "bytes": 44257,
+      "sha256": "1eab09ccc57a720de2febc7251df17e1adc644fa3f7e30936fa24cd13ca4e689",
+      "role": "granule",
+      "source_url": "https://opendap.earthdata.nasa.gov/collections/C2098858642-POCLOUD/granules/oscar_currents_final_20200128"
+    },
+    {
+      "path": "data/raw/oscar-final-20200101-20200130/oscar_currents_final_20200129.subset.nc4",
+      "bytes": 44259,
+      "sha256": "3b43db542d4b6952212e8375ff5842359f419ddefe828e6cefd76259d7fcc6a3",
+      "role": "granule",
+      "source_url": "https://opendap.earthdata.nasa.gov/collections/C2098858642-POCLOUD/granules/oscar_currents_final_20200129"
+    },
+    {
+      "path": "data/raw/oscar-final-20200101-20200130/oscar_currents_final_20200130.subset.nc4",
+      "bytes": 44257,
+      "sha256": "90c5676d63bae8a1b0c41bce04835a104bf789d708c86f1dda24f012ffa9c972",
+      "role": "granule",
+      "source_url": "https://opendap.earthdata.nasa.gov/collections/C2098858642-POCLOUD/granules/oscar_currents_final_20200130"
+    },
+    {
+      "bytes": 77672,
+      "sha256": "920209900b74526ea7c20285776ab72144bab5e687c1c95cb5ef8df2ff207dc7",
+      "source_count": 30,
+      "path": "data/raw/oscar-final-20200101-20200130/oscar-final-20200101-20200130.nc",
+      "role": "combined"
+    }
+  ]
+}
