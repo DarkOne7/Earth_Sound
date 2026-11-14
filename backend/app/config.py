@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     processing_end: str = "2020-01-30"
     minimum_usable_samples: int = Field(default=10, ge=1)
 
+    # Phase 4 sonification defaults. The remaining mapping constants live in
+    # app/schemas/soundscape.py (SonificationSettings) and docs/sonification-mapping.md.
+    soundscape_duration_seconds: float = Field(default=30.0, gt=0)
+    soundscape_sample_rate_hz: int = Field(default=44100, ge=8000)
+
     model_config = SettingsConfigDict(
         env_prefix="EARTH_JUKEBOX_",
         env_file=".env",
