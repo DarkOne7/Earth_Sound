@@ -72,9 +72,20 @@ python scripts/fetch_covid_sample.py --location Italy --location World
 
 The fetcher streams the 20 MB published table, records the SHA-256 of the exact published artifact, and writes only the requested locations' rows under the Git-ignored `data/raw/`.
 
+## Sirius spectrum
+
+The project also scans the visible part of the STScI CALSPEC Sirius reference spectrum. Wavelength maps to pitch from C3 at 380 nm to C5 at 780 nm, and relative spectral flux maps to loudness. See [`docs/sirius-spectrum-decision.md`](docs/sirius-spectrum-decision.md) for the source citations, pitch-to-wavelength table, processing rules, and limits. The spectrum-specific renderer is separate from the ocean/COVID time-series engine because it uses wavelength as pitch.
+
+```powershell
+Invoke-WebRequest -Uri "https://ssb.stsci.edu/cdbs/calspec/sirius_stis_005.fits" -OutFile "data/raw/sirius_stis_005.fits"
+python scripts/render_sirius_spectrum.py data/raw/sirius_stis_005.fits
+```
+
+This creates `data/processed/sirius-visible-spectrum.wav`; the committed per-bin provenance is `data/metadata/sirius-visible-spectrum.soundscape.json`.
+
 ## Sonification
 
-The engine renders any validated series into a reproducible, exactly 30-second stereo WAV (44.1 kHz, 16-bit) with no extra audio dependencies. Each sample becomes one pulse of a fixed 220 Hz tone, loudness comes from a normalized level, stereo position carries a second variable, and samples with no usable data are digital silence. Nothing is random, so identical input and settings give byte-identical output. Pitch never varies, because no dataset here has a variable mapped to it.
+The time-series engine renders any validated series into a reproducible, exactly 30-second stereo WAV (44.1 kHz, 16-bit) with no extra audio dependencies. Each sample becomes one pulse of a fixed 220 Hz tone, loudness comes from a normalized level, stereo position carries a second variable, and samples with no usable data are digital silence. Nothing is random, so identical input and settings give byte-identical output. This rule applies to the time-series engine; the separate Sirius wavelength scan maps wavelength to pitch.
 
 Each data domain supplies its own documented mapping, and both the engine's rules and the domain's rules are embedded in every output's provenance JSON:
 
@@ -83,7 +94,7 @@ Each data domain supplies its own documented mapping, and both the engine's rule
 | Ocean currents | speed vs. 0–2.5 m s⁻¹ | east–west component of direction (east = right) | one per day |
 | COVID-19 | `log10(weekly count)` vs. a cited 10⁵ deaths/week ceiling | week-over-week growth (doubling = hard right) | one per week |
 
-The COVID render uses the full −36 to 0 dB range across 240 weeks at 8 pulses/second; the OSCAR render spans about 10 dB across 30 days. Every rule, its rationale, the omitted mappings and the reference render hashes are in [`docs/sonification-mapping.md`](docs/sonification-mapping.md).
+The COVID render uses the full −36 to 0 dB range across 240 weeks at 8 pulses/second; the OSCAR render spans about 10 dB across 30 days. Every time-series rule, its rationale, the omitted mappings and the reference render hashes are in [`docs/sonification-mapping.md`](docs/sonification-mapping.md). Sirius-specific rules and the source spectrum citation are in [`docs/sirius-spectrum-decision.md`](docs/sirius-spectrum-decision.md).
 
 ```powershell
 python scripts/render_soundscape.py covid data\raw\owid-covid-weekly\owid-covid-weekly.csv --provenance-copy data\metadata
