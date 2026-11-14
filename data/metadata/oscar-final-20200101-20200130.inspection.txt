@@ -1,0 +1,67 @@
+NetCDF inspection: data/raw/oscar-final-20200101-20200130/oscar-final-20200101-20200130.nc
+
+Dimensions:
+- time: 30
+- longitude: 9
+- latitude: 9
+
+Longitude convention: 0 to 360
+Grid resolution (degrees): {"latitude": 0.25, "longitude": 0.25}
+Time: 2020-01-01T00:00:00 to 2020-01-30T00:00:00; cadence=86400.0 seconds; regular=True
+
+Variables:
+- u: dtype=float64, dims=['time', 'longitude', 'latitude'], units='m s-1', fill=-999.0, missing=0.0000%, min/max/mean=-0.6861370176936894/0.16595719684872876/-0.3268835997653784
+- v: dtype=float64, dims=['time', 'longitude', 'latitude'], units='m s-1', fill=-999.0, missing=0.0000%, min/max/mean=-0.334834891763499/0.8622015807269199/0.2508736762672109
+- lon: dtype=float64, dims=['longitude'], units='degrees_east', fill=None, missing=0.0000%, min/max/mean=208.0/210.0/209.0
+- lat: dtype=float64, dims=['latitude'], units='degrees_north', fill=None, missing=0.0000%, min/max/mean=0.0/2.0/1.0
+- time: dtype=float64, dims=['time'], units='days since 1990-01-01', fill=None, missing=0.0000%, min/max/mean=10957.0/10986.0/10971.5
+
+SST present: no
+SST candidate variables: []
+Missing/land/ice note: Missing values alone do not distinguish land, sea ice, or quality-control gaps.
+
+Global attributes:
+{
+  "Conventions": "CF-1.8 Standard Names v77, ACDD-1.3, netcdf 4.7.3, hdf5 1.8.12",
+  "acknowledgment": "OSCAR products are supported by NASA and may be freely distributed.",
+  "build_dmrpp_metadata.bes": "3.21.1-1090",
+  "build_dmrpp_metadata.build_dmrpp": "3.21.1-1090",
+  "build_dmrpp_metadata.created": "2026-08-19T06:25:35Z",
+  "build_dmrpp_metadata.invocation": "build_dmrpp -f /tmp/tmp4xr89ku8/oscar_currents_final_20200101.nc -r oscar_currents_final_20200101.nc.dmr -u OPeNDAP_DMRpp_DATA_ACCESS_URL -M",
+  "build_dmrpp_metadata.libdap": "libdap-3.21.1-389",
+  "creator_email": "kdohan@esr.org",
+  "creator_institution": "ESR",
+  "creator_name": "Kathleen Dohan",
+  "creator_type": "person",
+  "creator_url": "www.esr.org/research/oscar/",
+  "date_created": "2022-01-14",
+  "geospatial_lat_max": 89.75,
+  "geospatial_lat_min": -89.75,
+  "geospatial_lat_resolution": "0.25 degree",
+  "geospatial_lat_units": "degrees_north",
+  "geospatial_lon_max": 359.75,
+  "geospatial_lon_min": 0.0,
+  "geospatial_lon_resolution": "0.25 degree",
+  "geospatial_lon_units": "degrees_east",
+  "history": "OSCAR 0.25 degree daily version 2.0 replaces OSCAR third degree 5 day\n2026-11-14 09:32:03 GMT hyrax-1.18.0-166 https://opendap.earthdata.nasa.gov/collections/C2098858642-POCLOUD/granules/oscar_currents_final_20200101.dap.nc4?dap4.ce=%2Fu%5B0%3A0%5D%5B832%3A840%5D%5B359%3A367%5D%3B%2Fv%5B0%3A0%5D%5B832%3A840%5D%5B359%3A367%5D%3B%2Flat%5B359%3A367%5D%3B%2Flon%5B832%3A840%5D%3B%2Ftime\n\n2026-11-14T09:33:03.765089+00:00 Earth Jukebox: concatenated 30 subset granule outputs along time",
+  "history_json": "[{\"$schema\":\"https:\\/\\/harmony.earthdata.nasa.gov\\/schemas\\/history\\/0.1.0\\/history-0.1.0.json\",\"date_time\":\"2026-11-14T09:32:03.344+0000\",\"program\":\"hyrax\",\"version\":\"1.18.0-166\",\"parameters\":[{\"request_url\":\"https:\\/\\/opendap.earthdata.nasa.gov\\/collections\\/C2098858642-POCLOUD\\/granules\\/oscar_currents_final_20200101.dap.nc4?dap4.ce=%2Fu%5B0%3A0%5D%5B832%3A840%5D%5B359%3A367%5D%3B%2Fv%5B0%3A0%5D%5B832%3A840%5D%5B359%3A367%5D%3B%2Flat%5B359%3A367%5D%3B%2Flon%5B832%3A840%5D%3B%2Ftime\"},{\"decoded_constraint\":\"dap4.ce=\\/u[0:0][832:840][359:367];\\/v[0:0][832:840][359:367];\\/lat[359:367];\\/lon[832:840];\\/time\"}]}]",
+  "id": "OSCAR_L4_OC_FINAL_V2.0",
+  "institution": "Earth & Space Research",
+  "keywords": "ocean currents,ocean circulation,surface currents,ekman,geostrophic",
+  "processing_level": "L4",
+  "product_version": "v2.0",
+  "program": "OSCAR",
+  "project": "Ocean Surface Current Analyses Real-time (OSCAR)",
+  "publisher_email": "podaac@podaac.jpl.nasa.gov",
+  "publisher_institution": "PO.DAAC",
+  "publisher_name": "NASA Physical Oceanography Distributed Active Archive Center (PO.DAAC)",
+  "publisher_type": "institution",
+  "publisher_url": "podaac.jpl.nasa.gov",
+  "references": "www.esr.org/research/oscar/, PO.DAAC user guide, DOI: 10.5067/OSCAR-25F20",
+  "source": "OSCAR is based on simplified physics using satellite data; SSH source: CMEMS SSALTO/DUACS SEALEVEL_GLO_PHY_L4_MY_008_047 DOI: 10.48670/moi-00148 ; WIND source: ECMWF ERA5 10m wind DOI: 10.24381/cds.adbb2d47 ; SST source: CMC 0.1 deg SST V3.0 DOI: 10.5067/GHCMC-4FM03",
+  "standard_name_vocabulary": "NetCDF Climate and Forecast (CF) Metadata Convention",
+  "summary": "Global, daily, 0.25 degree geostrophic and total mixed layer currents averaged over the top 30m. Highest quality OSCAR product.",
+  "time_coverage_end": "2020-01-01T23:59:59",
+  "time_coverage_start": "2020-01-01T00:00:00",
+  "title": "Ocean Surface Current Analyses Real-time (OSCAR) Surface Currents - Final 0.25 Degree (Version 2.0)"
+}

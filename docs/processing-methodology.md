@@ -8,7 +8,7 @@ Code: `backend/app/services/series_extraction.py`, `backend/app/services/current
 
 ## Inputs and evidence
 
-Phase 2 did not commit a sample or a `data/metadata/` record because Earthdata retrieval is blocked (see [`ocean-dataset-decision.md`](ocean-dataset-decision.md)). This phase uses only facts that come from published provider metadata, and reads everything else from the file at run time:
+Phase 3 was first built from published provider metadata. On 2026-11-14 the default sample was retrieved and inspected, which confirmed each item below at file level (see *Inspected file facts* in [`ocean-dataset-decision.md`](ocean-dataset-decision.md)). Everything else is read from the file at run time:
 
 | Item | Value used | Evidence |
 |---|---|---|
@@ -120,8 +120,8 @@ The full reference, with source text and URL, is embedded in every output (`meta
 
 ## Known limitations and `UNVERIFIED` items
 
-- **No real OSCAR file has been processed yet.** All tests use synthetic NetCDF files. Coordinate attributes, the longitude convention, the `units` spelling, the presence of `_FillValue` and the time encoding in real files remain **`UNVERIFIED`** until Phase 2's Earthdata blocker is resolved. The code reads these from the file and fails clearly when they don't match.
-- The ±3 m s⁻¹ valid range and the −999 fill value come from catalog metadata (UMM-Var), not from an inspected file.
+- **Real data processed (2026-11-14):** the default sample (30 days, 9 × 9 cells) gives 30 of 30 usable samples in both point and region mode. The ±3 m s⁻¹ valid range (`valid_min`/`valid_max`) and the −999 `_FillValue` are confirmed in the file attributes.
+- **OSCAR time calendar:** files declare `units = "days since 1990-1-1"` with `calendar = "julian"`, and xarray decodes them as Julian-calendar dates. The `time_bounds` attribute and the CMR granule temporal extent both give the Gregorian day (e.g. value 10957 ↔ 2020-01-01). Julian and Gregorian day counts from 1990-01-01 agree until 2100-02-28, so extraction reads the decoded labels as UTC Gregorian dates (`LABEL_PRESERVING_CALENDARS`). Reading them as true Julian instants would shift every sample by 13 days. All other non-standard calendars are rejected. Each timestamp marks the start of the averaged day.
 - The 2.5 m s⁻¹ maximum describes the strongest western boundary currents. A quiet equatorial region will use only a small part of [0, 1]; that is intended, so loudness stays comparable across regions.
 - OSCAR currents represent an assumed well-mixed upper 30 m and are a Level-4 analysis, not in-situ measurements.
 - Region mode reports the speed of the mean vector, not the mean speed.

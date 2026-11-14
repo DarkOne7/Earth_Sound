@@ -1,0 +1,319 @@
+{
+  "file": "data/raw/oscar-final-20200101-20200130/oscar-final-20200101-20200130.nc",
+  "dimensions": {
+    "time": 30,
+    "longitude": 9,
+    "latitude": 9
+  },
+  "coordinates": {
+    "time": {
+      "units": "days since 1990-01-01",
+      "standard_name": "time",
+      "dtype": "float64",
+      "shape": [
+        30
+      ],
+      "minimum": 10957.0,
+      "maximum": 10986.0,
+      "resolution_degrees": 1.0
+    },
+    "lon": {
+      "units": "degrees_east",
+      "standard_name": "longitude",
+      "dtype": "float64",
+      "shape": [
+        9
+      ],
+      "minimum": 208.0,
+      "maximum": 210.0,
+      "resolution_degrees": 0.25
+    },
+    "lat": {
+      "units": "degrees_north",
+      "standard_name": "latitude",
+      "dtype": "float64",
+      "shape": [
+        9
+      ],
+      "minimum": 0.0,
+      "maximum": 2.0,
+      "resolution_degrees": 0.25
+    }
+  },
+  "latitude_coordinate": "lat",
+  "longitude_coordinate": "lon",
+  "longitude_convention": "0 to 360",
+  "grid_resolution_degrees": {
+    "latitude": 0.25,
+    "longitude": 0.25
+  },
+  "time": {
+    "coordinate": "time",
+    "units": "days since 1990-01-01",
+    "calendar": "julian",
+    "count": 30,
+    "time_coverage_start": "2020-01-01T00:00:00",
+    "time_coverage_end": "2020-01-30T00:00:00",
+    "cadence_seconds": 86400.0,
+    "cadence_regular": true,
+    "unique_cadence_seconds": [
+      86400.0
+    ]
+  },
+  "variables": {
+    "u": {
+      "name": "u",
+      "dtype": "float64",
+      "shape": [
+        30,
+        9,
+        9
+      ],
+      "dimensions": [
+        "time",
+        "longitude",
+        "latitude"
+      ],
+      "units": "m s-1",
+      "long_name": "zonal total surface current",
+      "standard_name": "eastward_sea_water_velocity",
+      "fill_value": -999.0,
+      "missing_value": null,
+      "scale_factor": null,
+      "add_offset": null,
+      "attributes": {
+        "_FillValue": -999.0,
+        "long_name": "zonal total surface current",
+        "standard_name": "eastward_sea_water_velocity",
+        "units": "m s-1",
+        "coverage_content_type": "modelResult",
+        "valid_min": -3.0,
+        "valid_max": 3.0,
+        "depth": "15m",
+        "comment": "Velocities are an average over the top 30m of the mixed layer",
+        "source": "SSH source: CMEMS SSALTO/DUACS SEALEVEL_GLO_PHY_L4_MY_008_047 DOI: 10.48670/moi-00148 ; WIND source: ECMWF ERA5 10m wind DOI: 10.24381/cds.adbb2d47 ; SST source: CMC 0.1 deg SST V3.0 DOI: 10.5067/GHCMC-4FM03",
+        "coordinates": "lon lat"
+      },
+      "missing_count": 0,
+      "missing_percent": 0.0,
+      "minimum": -0.6861370176936894,
+      "maximum": 0.16595719684872876,
+      "mean": -0.3268835997653784,
+      "range_check": {
+        "source": "valid_min/valid_max or valid_range attributes",
+        "lower": -3.0,
+        "upper": 3.0,
+        "outside_count": 0,
+        "status": "within documented range"
+      }
+    },
+    "v": {
+      "name": "v",
+      "dtype": "float64",
+      "shape": [
+        30,
+        9,
+        9
+      ],
+      "dimensions": [
+        "time",
+        "longitude",
+        "latitude"
+      ],
+      "units": "m s-1",
+      "long_name": "meridional total surface current",
+      "standard_name": "northward_sea_water_velocity",
+      "fill_value": -999.0,
+      "missing_value": null,
+      "scale_factor": null,
+      "add_offset": null,
+      "attributes": {
+        "_FillValue": -999.0,
+        "long_name": "meridional total surface current",
+        "standard_name": "northward_sea_water_velocity",
+        "units": "m s-1",
+        "coverage_content_type": "modelResult",
+        "valid_min": -3.0,
+        "valid_max": 3.0,
+        "depth": "15m",
+        "comment": "Velocities are an average over the top 30m of the mixed layer",
+        "source": "SSH source: CMEMS SSALTO/DUACS SEALEVEL_GLO_PHY_L4_MY_008_047 DOI: 10.48670/moi-00148 ; WIND source: ECMWF ERA5 10m wind DOI: 10.24381/cds.adbb2d47 ; SST source: CMC 0.1 deg SST V3.0 DOI: 10.5067/GHCMC-4FM03",
+        "coordinates": "lon lat"
+      },
+      "missing_count": 0,
+      "missing_percent": 0.0,
+      "minimum": -0.334834891763499,
+      "maximum": 0.8622015807269199,
+      "mean": 0.2508736762672109,
+      "range_check": {
+        "source": "valid_min/valid_max or valid_range attributes",
+        "lower": -3.0,
+        "upper": 3.0,
+        "outside_count": 0,
+        "status": "within documented range"
+      }
+    },
+    "lon": {
+      "name": "lon",
+      "dtype": "float64",
+      "shape": [
+        9
+      ],
+      "dimensions": [
+        "longitude"
+      ],
+      "units": "degrees_east",
+      "long_name": "longitude",
+      "standard_name": "longitude",
+      "fill_value": null,
+      "missing_value": null,
+      "scale_factor": null,
+      "add_offset": null,
+      "attributes": {
+        "long_name": "longitude",
+        "standard_name": "longitude",
+        "units": "degrees_east",
+        "axis": "X",
+        "valid_min": 0.0,
+        "valid_max": 359.75,
+        "bounds": "[0,359.75]"
+      },
+      "missing_count": 0,
+      "missing_percent": 0.0,
+      "minimum": 208.0,
+      "maximum": 210.0,
+      "mean": 209.0,
+      "range_check": {
+        "source": "valid_min/valid_max or valid_range attributes",
+        "lower": 0.0,
+        "upper": 359.75,
+        "outside_count": 0,
+        "status": "within documented range"
+      }
+    },
+    "lat": {
+      "name": "lat",
+      "dtype": "float64",
+      "shape": [
+        9
+      ],
+      "dimensions": [
+        "latitude"
+      ],
+      "units": "degrees_north",
+      "long_name": "latitude",
+      "standard_name": "latitude",
+      "fill_value": null,
+      "missing_value": null,
+      "scale_factor": null,
+      "add_offset": null,
+      "attributes": {
+        "long_name": "latitude",
+        "standard_name": "latitude",
+        "units": "degrees_north",
+        "axis": "Y",
+        "valid_min": -89.75,
+        "valid_max": 89.75,
+        "bounds": "[-89.75,89.75]"
+      },
+      "missing_count": 0,
+      "missing_percent": 0.0,
+      "minimum": 0.0,
+      "maximum": 2.0,
+      "mean": 1.0,
+      "range_check": {
+        "source": "valid_min/valid_max or valid_range attributes",
+        "lower": -89.75,
+        "upper": 89.75,
+        "outside_count": 0,
+        "status": "within documented range"
+      }
+    },
+    "time": {
+      "name": "time",
+      "dtype": "float64",
+      "shape": [
+        30
+      ],
+      "dimensions": [
+        "time"
+      ],
+      "units": "days since 1990-01-01",
+      "long_name": "time centered on the day",
+      "standard_name": "time",
+      "fill_value": null,
+      "missing_value": null,
+      "scale_factor": null,
+      "add_offset": null,
+      "attributes": {
+        "long_name": "time centered on the day",
+        "standard_name": "time",
+        "axis": "T",
+        "time_bounds": "2020-01-01 00:00:00 to 2020-01-01 23:59:59",
+        "comment": "Data is averaged over the day",
+        "units": "days since 1990-01-01",
+        "calendar": "julian"
+      },
+      "missing_count": 0,
+      "missing_percent": 0.0,
+      "minimum": 10957.0,
+      "maximum": 10986.0,
+      "mean": 10971.5,
+      "range_check": "not evaluated: source metadata has no valid range"
+    }
+  },
+  "global_attributes": {
+    "title": "Ocean Surface Current Analyses Real-time (OSCAR) Surface Currents - Final 0.25 Degree (Version 2.0)",
+    "summary": "Global, daily, 0.25 degree geostrophic and total mixed layer currents averaged over the top 30m. Highest quality OSCAR product.",
+    "keywords": "ocean currents,ocean circulation,surface currents,ekman,geostrophic",
+    "Conventions": "CF-1.8 Standard Names v77, ACDD-1.3, netcdf 4.7.3, hdf5 1.8.12",
+    "id": "OSCAR_L4_OC_FINAL_V2.0",
+    "history": "OSCAR 0.25 degree daily version 2.0 replaces OSCAR third degree 5 day\n2026-11-14 09:32:03 GMT hyrax-1.18.0-166 https://opendap.earthdata.nasa.gov/collections/C2098858642-POCLOUD/granules/oscar_currents_final_20200101.dap.nc4?dap4.ce=%2Fu%5B0%3A0%5D%5B832%3A840%5D%5B359%3A367%5D%3B%2Fv%5B0%3A0%5D%5B832%3A840%5D%5B359%3A367%5D%3B%2Flat%5B359%3A367%5D%3B%2Flon%5B832%3A840%5D%3B%2Ftime\n\n2026-11-14T09:33:03.765089+00:00 Earth Jukebox: concatenated 30 subset granule outputs along time",
+    "source": "OSCAR is based on simplified physics using satellite data; SSH source: CMEMS SSALTO/DUACS SEALEVEL_GLO_PHY_L4_MY_008_047 DOI: 10.48670/moi-00148 ; WIND source: ECMWF ERA5 10m wind DOI: 10.24381/cds.adbb2d47 ; SST source: CMC 0.1 deg SST V3.0 DOI: 10.5067/GHCMC-4FM03",
+    "processing_level": "L4",
+    "standard_name_vocabulary": "NetCDF Climate and Forecast (CF) Metadata Convention",
+    "acknowledgment": "OSCAR products are supported by NASA and may be freely distributed.",
+    "product_version": "v2.0",
+    "creator_name": "Kathleen Dohan",
+    "creator_email": "kdohan@esr.org",
+    "creator_url": "www.esr.org/research/oscar/",
+    "creator_type": "person",
+    "creator_institution": "ESR",
+    "institution": "Earth & Space Research",
+    "references": "www.esr.org/research/oscar/, PO.DAAC user guide, DOI: 10.5067/OSCAR-25F20",
+    "project": "Ocean Surface Current Analyses Real-time (OSCAR)",
+    "program": "OSCAR",
+    "publisher_name": "NASA Physical Oceanography Distributed Active Archive Center (PO.DAAC)",
+    "publisher_email": "podaac@podaac.jpl.nasa.gov",
+    "publisher_url": "podaac.jpl.nasa.gov",
+    "publisher_type": "institution",
+    "publisher_institution": "PO.DAAC",
+    "geospatial_lat_min": -89.75,
+    "geospatial_lat_max": 89.75,
+    "geospatial_lat_units": "degrees_north",
+    "geospatial_lat_resolution": "0.25 degree",
+    "geospatial_lon_min": 0.0,
+    "geospatial_lon_max": 359.75,
+    "geospatial_lon_units": "degrees_east",
+    "geospatial_lon_resolution": "0.25 degree",
+    "time_coverage_start": "2020-01-01T00:00:00",
+    "time_coverage_end": "2020-01-01T23:59:59",
+    "date_created": "2022-01-14",
+    "build_dmrpp_metadata.created": "2026-08-19T06:25:35Z",
+    "build_dmrpp_metadata.build_dmrpp": "3.21.1-1090",
+    "build_dmrpp_metadata.bes": "3.21.1-1090",
+    "build_dmrpp_metadata.libdap": "libdap-3.21.1-389",
+    "build_dmrpp_metadata.invocation": "build_dmrpp -f /tmp/tmp4xr89ku8/oscar_currents_final_20200101.nc -r oscar_currents_final_20200101.nc.dmr -u OPeNDAP_DMRpp_DATA_ACCESS_URL -M",
+    "history_json": "[{\"$schema\":\"https:\\/\\/harmony.earthdata.nasa.gov\\/schemas\\/history\\/0.1.0\\/history-0.1.0.json\",\"date_time\":\"2026-11-14T09:32:03.344+0000\",\"program\":\"hyrax\",\"version\":\"1.18.0-166\",\"parameters\":[{\"request_url\":\"https:\\/\\/opendap.earthdata.nasa.gov\\/collections\\/C2098858642-POCLOUD\\/granules\\/oscar_currents_final_20200101.dap.nc4?dap4.ce=%2Fu%5B0%3A0%5D%5B832%3A840%5D%5B359%3A367%5D%3B%2Fv%5B0%3A0%5D%5B832%3A840%5D%5B359%3A367%5D%3B%2Flat%5B359%3A367%5D%3B%2Flon%5B832%3A840%5D%3B%2Ftime\"},{\"decoded_constraint\":\"dap4.ce=\\/u[0:0][832:840][359:367];\\/v[0:0][832:840][359:367];\\/lat[359:367];\\/lon[832:840];\\/time\"}]}]"
+  },
+  "missing_data": {
+    "representation": "per-variable NaN/non-finite and declared fill/missing sentinels",
+    "explicit_mask_variables": [],
+    "interpretation": "Missing values alone do not distinguish land, sea ice, or quality-control gaps."
+  },
+  "sst": {
+    "present": false,
+    "candidate_variables": [],
+    "basis": "variable names, long_name, and standard_name in this file"
+  }
+}
