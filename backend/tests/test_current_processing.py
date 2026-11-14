@@ -325,3 +325,36 @@ def test_minimum_usable_samples_defaults_to_settings(monkeypatch):
         assert process_current_series(series).metadata.minimum_usable_samples == 15
     finally:
         get_settings.cache_clear()
+
+
+def test_mixed_naive_and_aware_timestamps_rejected():
+    stamps = [T0 + timedelta(days=i) for i in range(10)]
+    stamps[4] = stamps[4].replace(tzinfo=None)
+    with pytest.raises(CurrentProcessingError, match="mix timezone-aware and naive"):
+        process_current_series(make_series([0.1] * 10, [0.1] * 10, timestamps=stamps))
+
+
+@pytest.mark.parametrize(("minimum", "maximum"), [(1.0, 1.0), (2.0, 1.0), (0.0, float("inf")), (float("nan"), 1.0)])
+def test_degenerate_reference_range_rejected(minimum, maximum):
+    from app.services.reference_ranges import ReferenceRange
+
+    with pytest.raises(ValueError, match="reference"):
+        ReferenceRange(quantity="speed", minimum=minimum, maximum=maximum, units="m s-1", source="test", url="")
+
+
+def test_extracted_series_compares_and_hashes_by_identity():
+    series = make_series([0.1] * 3, [0.1] * 3)
+    other = make_series([0.1] * 3, [0.1] * 3)
+    assert series == series  # noqa: PLR0124 - identity equality is the behaviour under test
+    assert series != other
+    assert len({series, other}) == 2
+
+
+def test_insufficient_data_error_is_picklable():
+    import pickle
+
+    with pytest.raises(InsufficientDataError) as info:
+        process_current_series(make_series([np.nan] * 3, [np.nan] * 3), minimum_usable_samples=1)
+    restored = pickle.loads(pickle.dumps(info.value))
+    assert str(restored) == str(info.value)
+    assert restored.series.summary.missing == 3

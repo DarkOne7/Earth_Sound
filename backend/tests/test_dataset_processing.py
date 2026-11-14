@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import xarray as xr
 
-from backend.app.services.dataset_loader import DatasetLoadError, open_ocean_dataset
+from app.services.dataset_loader import DatasetLoadError, open_ocean_dataset
 from scripts.inspect_ocean_sample import inspect_netcdf, main as inspect_main
 
 

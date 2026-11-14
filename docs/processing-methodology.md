@@ -1,6 +1,6 @@
 # Processing methodology (Phase 3)
 
-**Processing version:** `1.0.1` (`backend/app/services/reference_ranges.py`, `PROCESSING_VERSION`)  
+**Processing version:** `1.0.2` (`backend/app/services/reference_ranges.py`, `PROCESSING_VERSION`)  
 **Date:** 2026-11-13  
 **Scope:** turn an OSCAR v2.0 `u`/`v` sample into a validated, normalized time series of current speed and direction for the sonification layer (Phase 4).
 
@@ -25,21 +25,22 @@ UMM-Var query (public, no credentials): <https://cmr.earthdata.nasa.gov/search/v
 - **Loading:** through the Phase 2 loader (`open_ocean_dataset`), with CF decoding, so the file's own `_FillValue` and `missing_value` become NaN.
 - **Coordinates:** identified from the file's CF attributes: `standard_name` (`latitude`, `longitude`, `time`), `units` (`degrees_north`, `degrees_east`, or CF time units `<unit> since <reference>`, read from attributes or from xarray's decoded encoding) or `axis` (`Y`, `X`, `T`). If none match, the extractor falls back only to the UMM-Var dimension names (`latitude`, `longitude`, `time`). Ambiguous or missing coordinates raise `SeriesExtractionError`. Dimension order is irrelevant because selection is by name.
 - **Longitude:** requests may use either −180..180 or 0..360. A request is converted to the file's convention, which is 0..360 if any longitude exceeds 180 and −180..180 otherwise.
-- **Point mode:** uses the nearest grid point. Longitude distance is measured around the circle. Ties go to the lowest index. A request farther than one grid step (the median coordinate spacing) from every grid point is rejected. The grid coordinates actually used are recorded.
-- **Region mode:** inclusive bounds; `west > east` means the region crosses the antimeridian. For each timestamp:
+- **Selection parameters** (lat, lon, region bounds) must be finite numbers; NaN or infinity raises `SeriesExtractionError`.
+- **Point mode:** uses the nearest grid point. Longitude distance is measured around the circle. Ties go to the lowest index. A request farther than one grid step (the median coordinate spacing) from every grid point is rejected. If an axis has only one value, its spacing can't be derived, so the request must match that value within 1e-6°. The grid coordinates actually used are recorded.
+- **Region mode:** inclusive bounds; `west > east` means the region crosses the antimeridian, and `east − west ≥ 360` selects every longitude (a full turn would otherwise wrap both bounds onto one meridian). For each timestamp:
   - a cell is *present* when both components are non-NaN and differ from the documented fill value;
   - no present cells gives `missing`;
   - any present cell that is infinite or outside the valid range gives `invalid`, and nothing is averaged around bad data;
   - otherwise `u` and `v` are averaged separately over the present cells, and the count is recorded as `cell_count`.
   Speed is then computed from the mean vector. That is **not** the same as the mean of the cell speeds; it is smaller when directions differ.
-- **Time window:** inclusive and in UTC. A date-only start means 00:00:00; a date-only end means 23:59:59.999999 of that day. Naive datetimes are treated as UTC. An empty window is an error.
+- **Time window:** inclusive and in UTC. A date-only bound, in ISO 8601 extended (`2020-01-30`) or basic (`20200130`) form, covers the whole day: start means 00:00:00 and end means 23:59:59.999999. Naive datetimes are treated as UTC. An empty window is an error. A series whose timestamps mix timezone-aware and naive values is rejected.
 - **Ordering:** timestamps keep file order. Duplicate or out-of-order timestamps raise an error, and nothing is sorted silently. Processing re-checks the order.
-- **Reproducibility:** the output records the selection parameters, the resolved UTC bounds, the dataset name and version, the file name and the file's SHA-256. The same parameters and file give byte-identical JSON (tested).
+- **Reproducibility:** the output records the selection parameters, the resolved UTC bounds, the dataset name and version, the file name and the file's SHA-256 (cached per path, modification time and size). The same parameters and file give byte-identical JSON (tested).
 - **Defaults** (`backend/app/config.py`, overridable as `EARTH_JUKEBOX_*` environment variables) match the Phase 2 sample: 2020-01-01 to 2020-01-30, bbox W −152 / S 0 / E −150 / N 2, and point (1.0, −151.0), the bbox centre.
 
 ## Units
 
-The `units` attribute of each component is normalized (lower-case, whitespace collapsed) and looked up in `VELOCITY_UNIT_FACTORS`. `m s-1`, `m/s`, `m s^-1`, `m.s-1` and spelled-out metres per second use factor 1. `cm s-1`, `cm/s` and `cm s^-1` use factor 0.01. A missing or unlisted unit raises `UnitConversionError`; units are never assumed. All outputs are in **m s⁻¹**, and the original units are recorded in `metadata.input_units`.
+The `units` attribute of each component is normalized (lower-case, whitespace collapsed) and looked up in `VELOCITY_UNIT_FACTORS`. `m s-1`, `m/s`, `m s^-1`, `m.s-1` and spelled-out metres per second use factor 1. `cm s-1`, `cm/s` and `cm s^-1` use factor 0.01. A missing or unlisted unit is rejected, and units are never assumed. Extraction checks units when the file is opened and raises `SeriesExtractionError` the same way in point and region mode. Processing raises `UnitConversionError` for series built by hand. All outputs are in **m s⁻¹**, and the original units are recorded in `metadata.input_units`.
 
 ## Speed
 
@@ -57,7 +58,7 @@ Note: the meteorological wind convention ("comes from") differs by 180°. A test
 
 ## Validity rules and status values
 
-Each component is classified first, then the two classifications are combined. The −999.0 sentinel is a file value, so it is compared before unit conversion. A value that only equals −999 after conversion (for example −99900 cm s⁻¹) is out of range, so it is `invalid`, not `missing`.
+All rules are applied in one place (`component_status_masks`), which processing and region aggregation both use. Each component is classified first, then the two classifications are combined. The −999.0 sentinel is a file value, so it is compared before unit conversion. A value that only equals −999 after conversion (for example −99900 cm s⁻¹) is out of range, so it is `invalid`, not `missing`.
 
 | Condition | Component status |
 |---|---|

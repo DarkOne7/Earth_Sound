@@ -7,6 +7,7 @@ NASA CMR UMM-Var for OSCAR v2.0 (``time``, ``longitude``, ``latitude``).
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import math
 import re
@@ -20,11 +21,23 @@ import xarray as xr
 
 from app.config import Settings, get_settings
 from app.schemas.current_series import ExtractedSeries, SampleStatus, SelectionParameters
-from app.services.current_processing import component_valid_mask, to_meters_per_second
+from app.services.current_processing import (
+    CurrentProcessingError,
+    UnitConversionError,
+    component_status_masks,
+    validate_timestamps,
+    velocity_unit_factor,
+)
 from app.services.dataset_loader import open_ocean_dataset
-from app.services.reference_ranges import DOCUMENTED_COMPONENT_FILL_VALUE
 
 TimeBound = datetime | date | str
+
+# ISO 8601 calendar date, extended (2020-01-30) or basic (20200130) format.
+_DATE_ONLY = re.compile(r"^\d{4}-?\d{2}-?\d{2}$")
+
+# Tolerance (degrees) for matching a request against a grid axis with a single
+# value, where the grid spacing cannot be derived from the file.
+SINGLE_VALUE_AXIS_TOLERANCE_DEG = 1e-6
 
 _AXIS_RULES = {
     "latitude": {
@@ -75,7 +88,7 @@ def _to_utc(value: TimeBound, *, end_of_day: bool) -> datetime:
     if isinstance(value, str):
         text = value.strip()
         try:
-            if len(text) == 10:
+            if _DATE_ONLY.match(text):
                 value = date.fromisoformat(text)
             else:
                 value = datetime.fromisoformat(text.replace("Z", "+00:00"))
@@ -123,18 +136,37 @@ def _longitude_in_file_convention(longitude: float, file_longitudes: np.ndarray)
     return ((longitude + 180.0) % 360.0) - 180.0
 
 
-def _grid_step(values: np.ndarray) -> float:
+def _max_grid_distance(values: np.ndarray) -> float:
+    """Largest accepted distance from a request to the nearest grid value.
+
+    One grid step (median spacing) for multi-value axes. A single-value axis has
+    no derivable spacing, so only a match within SINGLE_VALUE_AXIS_TOLERANCE_DEG
+    is accepted.
+    """
     if values.size < 2:
-        return math.inf
+        return SINGLE_VALUE_AXIS_TOLERANCE_DEG
     return float(np.median(np.abs(np.diff(values))))
 
 
-def _sha256(path: Path) -> str:
+def _require_finite(**values: float) -> None:
+    bad = [f"{name}={value}" for name, value in values.items() if not math.isfinite(value)]
+    if bad:
+        raise SeriesExtractionError(f"Selection parameters must be finite numbers: {', '.join(bad)}.")
+
+
+@functools.lru_cache(maxsize=32)
+def _sha256_cached(resolved: str, mtime_ns: int, size: int) -> str:
     digest = hashlib.sha256()
-    with path.open("rb") as handle:
+    with open(resolved, "rb") as handle:
         for chunk in iter(lambda: handle.read(1 << 20), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _sha256(path: Path) -> str:
+    """SHA-256 of a file, cached by resolved path, modification time and size."""
+    stat = path.stat()
+    return _sha256_cached(str(path.resolve()), stat.st_mtime_ns, stat.st_size)
 
 
 def _time_axis(dataset: xr.Dataset, time_name: str) -> list[datetime]:
@@ -155,14 +187,10 @@ def _select_times(
         raise SeriesExtractionError(f"Start {start.isoformat()} is after end {end.isoformat()}")
     indices = np.array([i for i, t in enumerate(timestamps) if start <= t <= end], dtype=int)
     selected = tuple(timestamps[i] for i in indices)
-    for position in range(1, len(selected)):
-        if selected[position] == selected[position - 1]:
-            raise SeriesExtractionError(f"Duplicate timestamp in dataset: {selected[position].isoformat()}")
-        if selected[position] < selected[position - 1]:
-            raise SeriesExtractionError(
-                f"Dataset timestamps are out of order: {selected[position].isoformat()} "
-                f"follows {selected[position - 1].isoformat()}"
-            )
+    try:
+        validate_timestamps(selected)
+    except CurrentProcessingError as exc:
+        raise SeriesExtractionError(f"Dataset time axis rejected: {exc}") from exc
     if not selected:
         raise SeriesExtractionError(
             f"No timestamps between {start.isoformat()} and {end.isoformat()} in the dataset."
@@ -206,6 +234,9 @@ class _OpenedSample:
             self.lons = np.asarray(self.dataset[self.lon_name].values, dtype=np.float64)
             self.u = _variable_array(self.dataset, u_variable, self.time_dim, self.lat_dim, self.lon_dim)
             self.v = _variable_array(self.dataset, v_variable, self.time_dim, self.lat_dim, self.lon_dim)
+            # Fail fast and identically in point and region mode on undocumented units.
+            for name in (u_variable, v_variable):
+                self.units(name)
         except Exception:
             self.dataset.close()
             raise
@@ -214,6 +245,10 @@ class _OpenedSample:
         units = self.metadata.variables[name].units
         if units is None:
             raise SeriesExtractionError(f"Variable {name!r} has no units attribute.")
+        try:
+            velocity_unit_factor(str(units))
+        except UnitConversionError as exc:
+            raise SeriesExtractionError(f"Variable {name!r}: {exc}") from exc
         return str(units)
 
     def source(self, dataset_name: str | None, dataset_version: str | None) -> dict[str, str | None]:
@@ -241,8 +276,9 @@ def extract_point_series(
 
     Longitude may be given in either convention; it is converted to the file's.
     Ties in distance resolve to the lowest grid index. Requests farther than one
-    grid step from every grid point are rejected.
+    grid step from every grid point are rejected (see ``_max_grid_distance``).
     """
+    _require_finite(latitude=latitude, longitude=longitude)
     if not -90.0 <= latitude <= 90.0:
         raise SeriesExtractionError(f"Latitude {latitude} is outside [-90, 90].")
     start_utc, end_utc = _to_utc(start, end_of_day=False), _to_utc(end, end_of_day=True)
@@ -253,7 +289,7 @@ def extract_point_series(
         lon_delta = np.abs(sample.lons - file_lon) % 360.0
         lon_distance = np.minimum(lon_delta, 360.0 - lon_delta)
         i, j = int(np.argmin(lat_distance)), int(np.argmin(lon_distance))
-        if lat_distance[i] > _grid_step(sample.lats) or lon_distance[j] > _grid_step(sample.lons):
+        if lat_distance[i] > _max_grid_distance(sample.lats) or lon_distance[j] > _max_grid_distance(sample.lons):
             raise SeriesExtractionError(
                 f"Point ({latitude}, {longitude}) is outside the dataset grid "
                 f"(nearest is {sample.lats[i]}, {sample.lons[j]})."
@@ -305,8 +341,9 @@ def extract_region_series(
     outside the documented valid range (or infinite) -> ``invalid`` (no averaging
     around bad data). Otherwise u and v are averaged separately over present
     cells; speed is later computed from that mean vector. ``west > east`` crosses
-    the antimeridian.
+    the antimeridian; ``east - west >= 360`` selects every longitude.
     """
+    _require_finite(south=south, north=north, west=west, east=east)
     if not (-90.0 <= south <= north <= 90.0):
         raise SeriesExtractionError(f"Invalid latitude bounds: south={south}, north={north}.")
     start_utc, end_utc = _to_utc(start, end_of_day=False), _to_utc(end, end_of_day=True)
@@ -315,7 +352,10 @@ def extract_region_series(
         lat_idx = np.flatnonzero((sample.lats >= south) & (sample.lats <= north))
         file_west = _longitude_in_file_convention(west, sample.lons)
         file_east = _longitude_in_file_convention(east, sample.lons)
-        if file_west <= file_east:
+        if east - west >= 360.0:
+            # A full turn wraps both bounds onto the same meridian; select everything.
+            lon_mask = np.isfinite(sample.lons)
+        elif file_west <= file_east:
             lon_mask = (sample.lons >= file_west) & (sample.lons <= file_east)
         else:
             lon_mask = (sample.lons >= file_west) | (sample.lons <= file_east)
@@ -330,29 +370,19 @@ def extract_region_series(
         v_cube = np.asarray(sample.v.isel(selector).values, dtype=np.float64).reshape(len(timestamps), -1)
         u_units, v_units = sample.units(u_variable), sample.units(v_variable)
 
-        u_mean = np.full(len(timestamps), np.nan)
-        v_mean = np.full(len(timestamps), np.nan)
-        statuses: list[SampleStatus | None] = []
-        counts: list[int] = []
-        for t in range(len(timestamps)):
-            u_raw, v_raw = u_cube[t], v_cube[t]
-            present = (
-                ~np.isnan(u_raw)
-                & ~np.isnan(v_raw)
-                & (u_raw != DOCUMENTED_COMPONENT_FILL_VALUE)
-                & (v_raw != DOCUMENTED_COMPONENT_FILL_VALUE)
-            )
-            counts.append(int(present.sum()))
-            if not present.any():
-                statuses.append(SampleStatus.MISSING)
-                continue
-            valid = component_valid_mask(to_meters_per_second(u_raw, u_units), to_meters_per_second(v_raw, v_units))
-            if (present & ~valid).any():
-                statuses.append(SampleStatus.INVALID)
-                continue
-            u_mean[t] = float(np.mean(u_raw[present]))
-            v_mean[t] = float(np.mean(v_raw[present]))
-            statuses.append(None)
+        # One vectorised pass over the (time, cell) block with the shared rules.
+        _, _, missing, invalid = component_status_masks(u_cube, v_cube, u_units, v_units)
+        present = ~missing
+        counts = present.sum(axis=1)
+        any_invalid = (present & invalid).any(axis=1)
+        usable = (counts > 0) & ~any_invalid
+        with np.errstate(invalid="ignore", divide="ignore"):
+            u_mean = np.where(usable, np.where(present, u_cube, 0.0).sum(axis=1) / counts, np.nan)
+            v_mean = np.where(usable, np.where(present, v_cube, 0.0).sum(axis=1) / counts, np.nan)
+        statuses: list[SampleStatus | None] = [
+            SampleStatus.MISSING if count == 0 else SampleStatus.INVALID if bad else None
+            for count, bad in zip(counts.tolist(), any_invalid.tolist(), strict=True)
+        ]
 
         return ExtractedSeries(
             timestamps=timestamps,
@@ -374,7 +404,7 @@ def extract_region_series(
             ),
             source=sample.source(dataset_name, dataset_version),
             forced_status=tuple(statuses),
-            cell_counts=tuple(counts),
+            cell_counts=tuple(int(c) for c in counts),
         )
     finally:
         sample.dataset.close()

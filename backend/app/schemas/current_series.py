@@ -52,12 +52,15 @@ class SelectionParameters(BaseModel):
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=False)
 class ExtractedSeries:
     """Raw, ordered u/v time series taken from a dataset, before validation.
 
     ``forced_status`` holds a status decided during extraction (region
     aggregation) or ``None`` when processing should decide.
+
+    ``eq=False``: numpy array fields make generated ``__eq__``/``__hash__``
+    unusable, so instances compare and hash by identity.
     """
 
     timestamps: tuple[datetime, ...]

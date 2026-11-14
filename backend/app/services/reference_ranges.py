@@ -6,6 +6,7 @@ See ``docs/processing-methodology.md`` for the full rationale.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 #: Unit used for every processed velocity and speed value.
@@ -17,7 +18,7 @@ CANONICAL_VELOCITY_UNITS = "m s-1"
 NUMERIC_TOLERANCE = 1e-9
 
 #: Version of the processing rules. Bump it whenever a rule or reference changes.
-PROCESSING_VERSION = "1.0.1"
+PROCESSING_VERSION = "1.0.2"
 
 
 @dataclass(frozen=True)
@@ -30,6 +31,14 @@ class ReferenceRange:
     units: str
     source: str
     url: str
+
+    def __post_init__(self) -> None:
+        if not (math.isfinite(self.minimum) and math.isfinite(self.maximum)):
+            raise ValueError(f"{self.quantity}: reference bounds must be finite")
+        if not self.minimum < self.maximum:
+            raise ValueError(
+                f"{self.quantity}: reference minimum {self.minimum} must be below maximum {self.maximum}"
+            )
 
 
 #: Physically plausible bounds for each velocity component (u and v).
@@ -71,9 +80,6 @@ SPEED_NORMALIZATION_RANGE = ReferenceRange(
     ),
     url="https://oceanservice.noaa.gov/facts/gulfstreamspeed.html",
 )
-
-#: Direction normalization: degrees in [0, 360) divided by 360 -> [0, 1).
-DIRECTION_RANGE_DEGREES = (0.0, 360.0)
 
 #: Unit spellings accepted for velocities, mapped to the factor converting them
 #: to m s-1. Any other unit string is rejected rather than guessed.

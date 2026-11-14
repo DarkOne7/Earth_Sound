@@ -66,6 +66,9 @@ class InsufficientDataError(CurrentProcessingError):
         super().__init__(message)
         self.series = series
 
+    def __reduce__(self):  # keep picklable despite the two-argument constructor
+        return (type(self), (str(self), self.series))
+
 
 def velocity_unit_factor(units: str | None) -> float:
     """Return the factor converting ``units`` to m s-1, or raise if undocumented."""
@@ -126,8 +129,8 @@ def normalize_speed(
         return 0.0, SampleFlag.CLIPPED_LOW
     if speed > reference.maximum:
         return 1.0, SampleFlag.CLIPPED_HIGH
-    if speed == reference.maximum:
-        return 1.0, None
+    # (max - min) / (max - min) is exactly 1.0 in IEEE arithmetic, so the upper
+    # bound maps to 1.0 without a special case. ReferenceRange guarantees min < max.
     return (speed - reference.minimum) / (reference.maximum - reference.minimum), None
 
 
@@ -142,25 +145,10 @@ def normalize_direction(direction_deg: float) -> float:
     return 0.0 if value >= 1.0 else value
 
 
-def classify_component(value: float) -> SampleStatus:
-    """Classify one velocity component already converted to m s-1.
-
-    The documented fill sentinel is a raw-file value, so callers must check it on
-    the unconverted value; here only NaN (a masked fill) counts as missing.
-    """
-    if math.isnan(value):
-        return SampleStatus.MISSING
-    if math.isinf(value):
-        return SampleStatus.INVALID
-    if not COMPONENT_VALID_RANGE.minimum <= value <= COMPONENT_VALID_RANGE.maximum:
-        return SampleStatus.INVALID
-    return SampleStatus.VALID
-
-
 def component_valid_mask(u: np.ndarray, v: np.ndarray) -> np.ndarray:
-    """Boolean mask of positions where both converted (m s-1) components are valid.
+    """Positions where both converted (m s-1) components are finite and in range.
 
-    Fill sentinels are not checked here: they apply to raw values only.
+    This is the single implementation of the documented valid-range rule.
     """
     u_arr = np.asarray(u, dtype=np.float64)
     v_arr = np.asarray(v, dtype=np.float64)
@@ -176,13 +164,34 @@ def component_valid_mask(u: np.ndarray, v: np.ndarray) -> np.ndarray:
         )
 
 
-def _combine(u_status: SampleStatus, v_status: SampleStatus) -> SampleStatus:
-    # Missing wins: if either component is absent the sample is missing, never half-valid.
-    if SampleStatus.MISSING in (u_status, v_status):
-        return SampleStatus.MISSING
-    if SampleStatus.INVALID in (u_status, v_status):
-        return SampleStatus.INVALID
-    return SampleStatus.VALID
+def component_status_masks(
+    raw_u: np.ndarray,
+    raw_v: np.ndarray,
+    u_units: str | None,
+    v_units: str | None,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Apply the documented validity rules to raw u/v arrays of any shape.
+
+    Returns ``(u_ms, v_ms, missing, invalid)``:
+
+    * ``missing``: either component is NaN (a masked fill, land, ice or grid gap)
+      or its **raw** value equals the documented fill sentinel. Missing wins over
+      invalid, so a sample is never half-valid.
+    * ``invalid``: not missing, and either component is infinite or outside the
+      documented valid range after conversion to m s-1.
+    """
+    raw_u = np.asarray(raw_u, dtype=np.float64)
+    raw_v = np.asarray(raw_v, dtype=np.float64)
+    u_ms = to_meters_per_second(raw_u, u_units)
+    v_ms = to_meters_per_second(raw_v, v_units)
+    missing = (
+        np.isnan(raw_u)
+        | np.isnan(raw_v)
+        | (raw_u == DOCUMENTED_COMPONENT_FILL_VALUE)
+        | (raw_v == DOCUMENTED_COMPONENT_FILL_VALUE)
+    )
+    invalid = ~missing & ~component_valid_mask(u_ms, v_ms)
+    return u_ms, v_ms, missing, invalid
 
 
 def _reference_model(reference: ReferenceRange) -> NormalizationReference:
@@ -215,7 +224,13 @@ def _summarize(samples: Sequence[CurrentSample]) -> SeriesSummary:
 
 
 def validate_timestamps(timestamps: Sequence) -> None:
-    """Raise if timestamps are not strictly increasing (duplicates or out of order)."""
+    """Raise if timestamps are not strictly increasing (duplicates or out of order).
+
+    Timestamps must be all timezone-aware or all naive; mixing them is rejected.
+    """
+    awareness = {getattr(t, "tzinfo", None) is not None for t in timestamps}
+    if len(awareness) > 1:
+        raise CurrentProcessingError("Timestamps mix timezone-aware and naive values")
     for index in range(1, len(timestamps)):
         previous, current = timestamps[index - 1], timestamps[index]
         if current == previous:
@@ -256,25 +271,18 @@ def process_current_series(
         raise CurrentProcessingError("cell_counts length does not match the timestamps")
     validate_timestamps(series.timestamps)
 
-    raw_u = np.asarray(series.u, dtype=np.float64)
-    raw_v = np.asarray(series.v, dtype=np.float64)
-    u_ms = to_meters_per_second(raw_u, series.u_units)
-    v_ms = to_meters_per_second(raw_v, series.v_units)
+    u_ms, v_ms, missing, invalid = component_status_masks(series.u, series.v, series.u_units, series.v_units)
+    speeds = current_speed(u_ms, v_ms)
+    directions = current_direction(u_ms, v_ms, tolerance=tolerance)
 
     samples: list[CurrentSample] = []
     for index, timestamp in enumerate(series.timestamps):
-        # Fill sentinels are checked on the raw (unconverted) values.
-        u_status = (
-            SampleStatus.MISSING
-            if raw_u[index] == DOCUMENTED_COMPONENT_FILL_VALUE
-            else classify_component(float(u_ms[index]))
-        )
-        v_status = (
-            SampleStatus.MISSING
-            if raw_v[index] == DOCUMENTED_COMPONENT_FILL_VALUE
-            else classify_component(float(v_ms[index]))
-        )
-        status = _combine(u_status, v_status)
+        if missing[index]:
+            status = SampleStatus.MISSING
+        elif invalid[index]:
+            status = SampleStatus.INVALID
+        else:
+            status = SampleStatus.VALID
         if series.forced_status is not None and series.forced_status[index] is not None:
             status = series.forced_status[index]
         cell_count = series.cell_counts[index] if series.cell_counts is not None else None
@@ -295,10 +303,9 @@ def process_current_series(
             )
             continue
 
-        u_value, v_value = float(u_ms[index]), float(v_ms[index])
-        speed = float(current_speed(u_value, v_value))
+        speed = float(speeds[index])
         speed_normalized, flag = normalize_speed(speed, speed_reference)
-        direction = float(current_direction(u_value, v_value, tolerance=tolerance))
+        direction = float(directions[index])
         if math.isnan(direction):
             status = SampleStatus.UNDEFINED_DIRECTION
             direction_value = None
@@ -309,8 +316,8 @@ def process_current_series(
         samples.append(
             CurrentSample(
                 timestamp=timestamp,
-                u=u_value,
-                v=v_value,
+                u=float(u_ms[index]),
+                v=float(v_ms[index]),
                 speed=speed,
                 direction_deg=direction_value,
                 speed_normalized=speed_normalized,

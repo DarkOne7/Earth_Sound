@@ -223,3 +223,77 @@ def test_region_converted_sentinel_is_invalid(tmp_path):
     path = write_sample(tmp_path / "cms.nc", u=u, v=np.full((12, 3, 3), 10.0), units="cm s-1")
     series = extract_region_series(path, south=0.0, north=1.0, west=-152.0, east=-151.5, start="2020-01-01", end="2020-01-12")
     assert series.forced_status[0] is SampleStatus.INVALID
+
+
+@pytest.mark.parametrize("longitude", [float("nan"), float("inf"), -float("inf")])
+def test_point_non_finite_longitude_rejected(sample, longitude):
+    with pytest.raises(SeriesExtractionError, match="finite"):
+        extract_point_series(sample, latitude=0.3, longitude=longitude, start="2020-01-01", end="2020-01-12")
+
+
+def test_point_non_finite_latitude_rejected(sample):
+    with pytest.raises(SeriesExtractionError, match="finite"):
+        extract_point_series(sample, latitude=float("nan"), longitude=-151.7, start="2020-01-01", end="2020-01-12")
+
+
+@pytest.mark.parametrize(("west", "east"), [(-180.0, 180.0), (0.0, 360.0), (-200.0, 200.0)])
+def test_full_turn_region_selects_every_longitude(sample, west, east):
+    series = extract_region_series(sample, south=0.0, north=1.0, west=west, east=east, start="2020-01-01", end="2020-01-12")
+    assert series.selection.region_cell_count == len(LONS_360) * len(LATS)
+
+
+@pytest.mark.parametrize("bound", ["west", "east", "south", "north"])
+def test_region_non_finite_bound_rejected(sample, bound):
+    bounds = {"south": 0.0, "north": 1.0, "west": -152.0, "east": -151.5, bound: float("nan")}
+    with pytest.raises(SeriesExtractionError, match="finite"):
+        extract_region_series(sample, start="2020-01-01", end="2020-01-12", **bounds)
+
+
+def test_single_value_axis_does_not_disable_grid_check(tmp_path):
+    times = TIMES
+    dataset = xr.Dataset(
+        {
+            "u": (("time", "longitude", "latitude"), np.full((12, 3, 1), 0.3), {"units": "m s-1"}),
+            "v": (("time", "longitude", "latitude"), np.full((12, 3, 1), 0.4), {"units": "m s-1"}),
+        },
+        coords={"time": times, "longitude": LONS_360, "latitude": [1.0]},
+    )
+    dataset["latitude"].attrs["standard_name"] = "latitude"
+    dataset["longitude"].attrs["standard_name"] = "longitude"
+    path = tmp_path / "one_row.nc"
+    dataset.to_netcdf(path)
+    dataset.close()
+    with pytest.raises(SeriesExtractionError, match="outside the dataset grid"):
+        extract_point_series(path, latitude=80.0, longitude=-151.75, start="2020-01-01", end="2020-01-12")
+    series = extract_point_series(path, latitude=1.0, longitude=-151.75, start="2020-01-01", end="2020-01-12")
+    assert series.selection.selected_latitude == 1.0
+
+
+@pytest.mark.parametrize("mode", ["point", "region"])
+def test_unsupported_units_fail_identically_in_both_modes(tmp_path, mode):
+    path = write_sample(tmp_path / "knots.nc", u=np.full((12, 3, 3), np.nan), units="knots")
+    with pytest.raises(SeriesExtractionError, match="Unsupported velocity units"):
+        if mode == "point":
+            extract_point_series(path, latitude=0.3, longitude=-151.7, start="2020-01-01", end="2020-01-12")
+        else:
+            extract_region_series(path, south=0.0, north=1.0, west=-152.0, east=-151.5, start="2020-01-01", end="2020-01-12")
+
+
+def test_compact_date_end_bound_covers_whole_day(tmp_path):
+    noon = TIMES + np.timedelta64(12, "h")
+    path = write_sample(tmp_path / "noon.nc", times=noon)
+    series = extract_point_series(path, latitude=0.3, longitude=-151.7, start="20200101", end="20200105")
+    assert [t.day for t in series.timestamps] == [1, 2, 3, 4, 5]
+    assert series.selection.end.hour == 23
+
+
+def test_source_hash_is_cached_and_tracks_changes(tmp_path):
+    from app.services import series_extraction
+
+    path = write_sample(tmp_path / "hash.nc")
+    first = series_extraction._sha256(path)
+    hits_before = series_extraction._sha256_cached.cache_info().hits
+    assert series_extraction._sha256(path) == first
+    assert series_extraction._sha256_cached.cache_info().hits == hits_before + 1
+    write_sample(path, u=np.full((12, 3, 3), 0.1))
+    assert series_extraction._sha256(path) != first
