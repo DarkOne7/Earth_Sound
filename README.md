@@ -59,6 +59,24 @@ series = process_current_series(extract_default_series("data/raw/.../sample.nc")
 print(series.model_dump_json(indent=2))
 ```
 
+## Sonification
+
+Phase 4 renders a processed series into a reproducible, exactly 30-second stereo WAV (44.1 kHz, 16-bit) with no extra audio dependencies. Each sample of the series becomes one pulse of a fixed 220 Hz tone (one per day for the OSCAR sample): current speed sets loudness through `speed_normalized` (−36 dB at 0, 0 dB at 2.5 m s⁻¹), the east–west component of direction pans the pulse (eastward = right, westward = left; north–south is not rendered), and missing or invalid samples are digital silence. Nothing is random, so identical input and settings give byte-identical output. Temperature is not mapped because the dataset has no temperature variable. Every rule, its rationale and the omitted mappings are in [`docs/sonification-mapping.md`](docs/sonification-mapping.md) and are embedded in each output's provenance JSON.
+
+```powershell
+python scripts/render_soundscape.py data\raw\oscar-final-20200101-20200130\oscar-final-20200101-20200130.nc --mode point --provenance-copy data\metadata
+```
+
+This writes `data/processed/<sample>.point.wav` and `<sample>.point.soundscape.json`. The provenance of the reference renders is committed under `data/metadata/`.
+
+```python
+from app.services.sonification import render_soundscape
+
+rendered = render_soundscape(series)          # series: ProcessedCurrentSeries from Phase 3
+open("soundscape.wav", "wb").write(rendered.wav_bytes)
+print(rendered.provenance.model_dump_json(indent=2))
+```
+
 Install the optional development dependency before running tests:
 
 ```powershell
