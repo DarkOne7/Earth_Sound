@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from typing import Literal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 from pydantic import BaseModel
 
-from app.config import Settings, get_settings
+from app.api.parameters import SettingsDep
 from app.services.catalog import describe_domains
 
 router = APIRouter(tags=["domains"])
@@ -25,6 +25,6 @@ class DomainDescription(BaseModel):
 
 
 @router.get("/domains", response_model=list[DomainDescription])
-def list_domains(settings: Settings = Depends(get_settings)) -> list[dict]:
+def list_domains(settings: SettingsDep) -> list[dict]:
     """Every data domain, and whether its sample has been fetched to this machine."""
     return describe_domains(settings)
