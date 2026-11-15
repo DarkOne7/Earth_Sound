@@ -81,6 +81,56 @@ SPEED_NORMALIZATION_RANGE = ReferenceRange(
     url="https://oceanservice.noaa.gov/facts/gulfstreamspeed.html",
 )
 
+#: Version of the COVID-19 case-series processing rules.
+CASE_PROCESSING_VERSION = "1.0.0"
+
+#: Logarithmic normalization range for weekly reported COVID-19 deaths.
+#: The lower bound is the smallest reportable non-zero count, so its log10 is 0.
+#: The upper bound is the nearest power of ten at or above the global historical
+#: peak. WHO's weekly epidemiological update for the week ending 2021-01-17
+#: reported a then-record ~93 000 deaths, and WHO's deputy head publicly warned
+#: the world was approaching "100 000 deaths a week"; the revised OWID/WHO series
+#: peaks at 103 719 for the week ending 2021-01-24. 1e5 is therefore a round,
+#: externally grounded ceiling rather than a value taken from the sample, and it
+#: is held fixed for every location so loudness stays comparable between them.
+COVID_WEEKLY_DEATHS_RANGE = ReferenceRange(
+    quantity="weekly reported COVID-19 deaths",
+    minimum=1.0,
+    maximum=100_000.0,
+    units="deaths per week",
+    source=(
+        "Upper bound: nearest power of ten at or above the global historical peak of weekly reported "
+        "deaths. WHO Weekly epidemiological update, 19 January 2021, reported a record ~93 000 deaths "
+        "for the preceding week, and WHO warned of approaching 100 000 deaths per week; the revised "
+        "Our World In Data / WHO series peaks at 103 719 (week ending 2021-01-24), which clips to 1.0. "
+        "Lower bound: 1 is the smallest reportable non-zero count, so log10 of the minimum is 0. "
+        "Accessed 2026-11-14"
+    ),
+    url="https://www.who.int/publications/m/item/weekly-epidemiological-update---19-january-2021",
+)
+
+#: Logarithmic normalization range for weekly reported COVID-19 cases.
+#: Cases span three more decades than deaths and are far more sensitive to
+#: testing capacity and to reporting backlogs, so this series is offered but is
+#: not the default. See ``docs/covid-dataset-decision.md``.
+COVID_WEEKLY_CASES_RANGE = ReferenceRange(
+    quantity="weekly reported COVID-19 cases",
+    minimum=1.0,
+    maximum=100_000_000.0,
+    units="cases per week",
+    source=(
+        "Upper bound: nearest power of ten at or above the global historical peak of weekly reported "
+        "cases in the Our World In Data / WHO series, 44 236 227 for the week ending 2022-12-25, which "
+        "is itself inflated by China's reporting backlog after reopening. Lower bound: 1 is the "
+        "smallest reportable non-zero count. Accessed 2026-11-14"
+    ),
+    url="https://github.com/owid/covid-19-data/tree/master/public/data",
+)
+
+#: Week-over-week log2 ratio that pans fully to one side. 1.0 means a doubling
+#: of the weekly count pans hard right and a halving pans hard left.
+PAN_LOG2_FULL_SCALE = 1.0
+
 #: Unit spellings accepted for velocities, mapped to the factor converting them
 #: to m s-1. Any other unit string is rejected rather than guessed.
 VELOCITY_UNIT_FACTORS: dict[str, float] = {

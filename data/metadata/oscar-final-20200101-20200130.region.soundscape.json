@@ -1,6 +1,6 @@
 {
-  "sonification_version": "1.0.0",
-  "determinism": "No randomness is used. Identical ProcessedCurrentSeries content and identical SonificationSettings give byte-identical WAV bytes and provenance on the same platform and NumPy build (tested). Across platforms, floating-point libm differences may change isolated PCM samples by at most 1 LSB; two renders are considered equivalent when their provenance (excluding output.sha256) is identical and every PCM sample differs by at most 1 LSB.",
+  "sonification_version": "2.0.0",
+  "determinism": "No randomness is used. Identical series content and identical SonificationSettings give byte-identical WAV bytes and provenance on the same platform and NumPy build (tested). Across platforms, floating-point libm differences may change isolated PCM samples by at most 1 LSB; two renders are considered equivalent when their provenance (excluding output.sha256) is identical and every PCM sample differs by at most 1 LSB.",
   "settings": {
     "duration_seconds": 30.0,
     "sample_rate_hz": 44100,
@@ -16,38 +16,72 @@
     "peak_amplitude": 0.9,
     "attack_seconds": 0.01,
     "release_seconds": 0.05,
-    "direction_mapping": "stereo_pan_east_west"
+    "pan_enabled": true,
+    "timing_mode": "rate_weighted",
+    "rate_sensitivity": 1.5
   },
-  "mappings": [
+  "engine_mappings": [
     {
-      "sound_parameter": "segment timing (rhythm)",
-      "source_measurement": "sample order and count of the processed series (one sample per file time step)",
-      "rule": "duration_seconds is split into len(samples) equal segments in series order; segment i covers frames [round(i*F/n), round((i+1)*F/n)) with F = round(duration*sample_rate). Each audible segment is shaped by a linear attack and release envelope, so each sample is one pulse.",
+      "sound_parameter": "segment order (which pulse is which sample)",
+      "source_measurement": "sample order of the validated series",
+      "rule": "The samples are rendered in series order, one segment each, covering the whole duration with no overlap and no gap. Each audible segment is shaped by a linear attack and release envelope, so each sample is one pulse. Every segment records its own timestamp, start_seconds and end_seconds, so the mapping from audio time to data time is always exact.",
       "rationale": "Temporal change is heard as a sequence of pulses that follows the measured time axis."
     },
     {
+      "sound_parameter": "segment length (pulse rate / rhythm)",
+      "source_measurement": "rate_normalized in [0, 1], the normalized rate of change derived and documented by the data domain; unused under timing_mode='uniform'",
+      "rule": "timing_mode='uniform': every sample gets an equal share of the duration. timing_mode='rate_weighted' (default): a sample's share is proportional to 1 / (1 + rate_sensitivity * rate_normalized), so rapid change gives short segments and a fast pulse, calm stretches give long segments and a slow pulse. The total duration is unchanged; only its distribution moves. Boundaries are computed in exact rational arithmetic. provenance.timing records the mode, the mean and fastest pulse rates, whether the fastest stretch stays below the 20 Hz rhythm floor, and whether the time axis is linear.",
+      "rationale": "A uniform pulse makes a long calm stretch and a sudden surge sound equally eventful. Letting the rate of change set the pulse rate means acceleration is heard as acceleration, which is the quantity a listener registers most immediately. The cost is that audio time is no longer proportional to elapsed data time, so linear_time_axis is recorded as false and each segment carries its own timestamp for the exact mapping."
+    },
+    {
       "sound_parameter": "loudness (gain)",
-      "source_measurement": "speed_normalized in [0, 1] (speed against the documented 0-2.5 m s-1 range)",
-      "rule": "gain_db = gain_floor_db * (1 - speed_normalized); amplitude = peak_amplitude * 10**(gain_db/20). speed_normalized = 0 gives gain_floor_db (default -36 dB), 1 gives 0 dB. Clipped speeds already carry speed_normalized = 1 (flag clipped_high) and sound at 0 dB.",
-      "rationale": "Perceived loudness grows roughly with the logarithm of amplitude, so equal steps in normalized speed give roughly equal loudness steps. Zero speed stays audible so it is distinguishable from silence, which means no data."
+      "source_measurement": "level_normalized in [0, 1], derived and documented by the data domain",
+      "rule": "gain_db = gain_floor_db * (1 - level_normalized); amplitude = peak_amplitude * 10**(gain_db/20). level_normalized = 0 gives gain_floor_db (default -36 dB), 1 gives 0 dB.",
+      "rationale": "Perceived loudness grows roughly with the logarithm of amplitude, so equal steps in the normalized level give roughly equal loudness steps. A level of 0 stays audible so that a measured minimum is distinguishable from silence, which means absent data."
     },
     {
       "sound_parameter": "silence",
-      "source_measurement": "sample status",
-      "rule": "status missing or invalid renders digital silence for the whole segment (all PCM samples 0).",
+      "source_measurement": "the domain's audibility decision for each sample",
+      "rule": "A sample the domain marked inaudible renders digital silence for its whole segment (all PCM samples 0).",
       "rationale": "A gap in the data must not be heard as a measurement, so it is not heard at all."
     },
     {
       "sound_parameter": "stereo position (pan)",
-      "source_measurement": "direction_deg (direction the current flows toward, clockwise from north)",
-      "rule": "pan = sin(radians(direction_deg)) in [-1, 1]; 90 (eastward) = +1 = right, 270 (westward) = -1 = left, 0 and 180 (northward, southward) = 0 = centre. Undefined direction = centre. Constant-power law: angle = (pan + 1)/2 * pi/2, left = cos(angle), right = sin(angle). Disabled when direction_mapping = 'none' (all centred).",
-      "rationale": "Direction is circular; mapping it to a linear parameter such as pitch would put a discontinuity at north. The east-west component maps continuously to left-right. The north-south component is NOT rendered: northward and southward flow sound the same (documented MVP limitation)."
+      "source_measurement": "pan in [-1, 1], derived and documented by the data domain",
+      "rule": "Constant-power law: angle = (pan + 1)/2 * pi/2, left = cos(angle), right = sin(angle), so left**2 + right**2 = 1 at every position. pan = None (unmapped or undefined) is centred. Disabled when pan_enabled is false, which centres every segment.",
+      "rationale": "Stereo position is a continuous dimension with no discontinuity, so it carries a second variable without disturbing the loudness that encodes the first."
     },
     {
       "sound_parameter": "pitch and timbre",
       "source_measurement": "none (constant)",
       "rule": "Fixed carrier at carrier_frequency_hz with harmonics 1..n at harmonic_amplitudes, normalized by their sum so the waveform peak never exceeds 1 before gain. Phase is continuous across the whole file.",
-      "rationale": "Nothing is mapped to pitch, so pitch must not vary and suggest a measurement that does not exist."
+      "rationale": "No domain maps a measurement to pitch, so pitch must not vary and imply a measurement that does not exist."
+    }
+  ],
+  "domain_mappings": [
+    {
+      "sound_parameter": "level_normalized (-> loudness)",
+      "source_measurement": "current speed in m s-1, normalized against 0-2.5 m s-1 (Phase 3 speed_normalized)",
+      "rule": "level_normalized = speed_normalized, used unchanged. Speeds above the reference maximum were already clipped to 1.0 by Phase 3 and carry the clipped_high flag.",
+      "rationale": "Speed is the primary quantity a listener should feel. Its reference range is global, not per-sample, so loudness is comparable between regions."
+    },
+    {
+      "sound_parameter": "pan (-> stereo position)",
+      "source_measurement": "direction_deg, the direction the current flows toward, clockwise from true north",
+      "rule": "pan = sin(radians(direction_deg)), the east-west component. 90 (eastward) = +1 = right, 270 (westward) = -1 = left, 0 and 180 (northward, southward) = 0 = centre. Values below 1e-12 are snapped to 0. Undefined direction (zero speed) = centre.",
+      "rationale": "Direction is circular, so mapping it to a linear parameter such as pitch would put a discontinuity at north and make 359 and 1 degrees sound maximally different although they are nearly the same flow. The east-west component maps continuously to left-right."
+    },
+    {
+      "sound_parameter": "rate_normalized (-> pulse rate)",
+      "source_measurement": "change in normalized speed since the previous usable sample",
+      "rule": "rate_normalized = min(1, |speed_normalized - previous speed_normalized| / 0.25). A change of a quarter of the full 0-2.5 m s-1 scale in one step (0.625 m s-1) gives the fastest pulse. The first usable sample and any sample following a gap have no previous value, so their rate is unknown and treated as 0 (slowest).",
+      "rationale": "A difference of two already-cited normalized speeds needs no further reference of its own. The 0.25 full scale is a product choice: daily surface-current changes are small, so a full scale of 1.0 would leave the pulse almost constant."
+    },
+    {
+      "sound_parameter": "audibility",
+      "source_measurement": "Phase 3 sample status",
+      "rule": "valid and undefined_direction are audible; missing and invalid are silent. A measured zero speed therefore still sounds, at the gain floor.",
+      "rationale": "Absent or rejected measurements must not be rendered as a current of zero speed."
     }
   ],
   "omitted_mappings": [
@@ -61,14 +95,18 @@
       "sound_parameter": "north-south component of direction",
       "source_measurement": "cos(direction_deg)",
       "rule": "Not rendered.",
-      "rationale": "No single clear, testable audio dimension was identified for a second circular component in the MVP. Candidate for a later phase (e.g. brightness/filter cutoff), to be validated in Phase 6 listening tests."
+      "rationale": "No single clear, testable audio dimension was identified for a second circular component in the MVP, so northward and southward flow sound the same. Candidate for a later phase (e.g. brightness/filter cutoff), to be validated in Phase 6 listening tests."
     }
   ],
   "source": {
+    "domain": "ocean_currents",
     "dataset": "OSCAR_L4_OC_FINAL_V2.0",
     "dataset_version": "2.0",
     "source_file": "oscar-final-20200101-20200130.nc",
     "source_sha256": "920209900b74526ea7c20285776ab72144bab5e687c1c95cb5ef8df2ff207dc7",
+    "source_url": null,
+    "processing_version": "1.0.2",
+    "cadence": "One sample per dataset time step (daily for OSCAR v2.0).",
     "selection": {
       "mode": "region",
       "start": "2020-01-01T00:00:00Z",
@@ -83,12 +121,36 @@
       "selected_longitude": null,
       "region_cell_count": 81
     },
-    "processing_version": "1.0.2",
-    "speed_normalization": "0.0-2.5 m s-1 (Minimum: speed is a vector magnitude and cannot be negative. Maximum: NOAA National Ocean Service, 'How fast is the Gulf Stream?' — typical maximum surface speed about 9 km/h (2.5 m s-1); accessed 2026-11-13)",
-    "direction_convention": "Direction the current flows toward, in degrees clockwise from true north, range [0, 360); 0 = northward, 90 = eastward, 180 = southward, 270 = westward. Computed as atan2(u, v) mod 360. Undefined (null) when speed <= numeric tolerance.",
+    "mapping_source": {
+      "level_quantity": "current speed (m s-1), normalized against the Phase 3 reference range",
+      "level_reference": {
+        "quantity": "current speed",
+        "minimum": 0.0,
+        "maximum": 2.5,
+        "units": "m s-1",
+        "source": "Minimum: speed is a vector magnitude and cannot be negative. Maximum: NOAA National Ocean Service, 'How fast is the Gulf Stream?' — typical maximum surface speed about 9 km/h (2.5 m s-1); accessed 2026-11-13",
+        "url": "https://oceanservice.noaa.gov/facts/gulfstreamspeed.html"
+      },
+      "pan_quantity": "direction the current flows toward (degrees clockwise from true north)",
+      "pan_rule": "pan = sin(radians(direction_deg)); east-west component only",
+      "rate_quantity": "change in normalized speed since the previous usable sample",
+      "rate_rule": "rate = min(1, |delta speed_normalized| / 0.25); unknown at the start and after a gap"
+    },
     "total_samples": 30,
-    "usable_samples": 30,
+    "audible_samples": 30,
     "silent_samples": 0
+  },
+  "timing": {
+    "timing_mode": "rate_weighted",
+    "rate_sensitivity": 1.5,
+    "linear_time_axis": false,
+    "segment_count": 30,
+    "segment_seconds_min": 0.757891156462585,
+    "segment_seconds_max": 1.1500680272108843,
+    "pulse_rate_hz_mean": 1.0,
+    "pulse_rate_hz_max": 1.319450677677049,
+    "rhythm_floor_hz": 20.0,
+    "heard_as_rhythm": true
   },
   "segments": [
     {
@@ -97,15 +159,20 @@
       "status": "valid",
       "flags": [],
       "start_seconds": 0.0,
-      "end_seconds": 1.0,
+      "end_seconds": 1.1500680272108843,
       "start_frame": 0,
-      "end_frame": 44100,
+      "end_frame": 50718,
       "audible": true,
-      "speed_m_s": 0.22493281989682934,
-      "speed_normalized": 0.08997312795873173,
+      "source_values": {
+        "speed_m_s": 0.22493281989682934,
+        "direction_deg": 348.9271659966449,
+        "u_m_s": -0.043199850306609604,
+        "v_m_s": 0.22074543347536316
+      },
+      "level_normalized": 0.08997312795873173,
+      "rate_normalized": null,
       "gain_db": -32.76096739348566,
       "amplitude": 0.020710669571370095,
-      "direction_deg": 348.9271659966449,
       "pan": -0.19205667864042375
     },
     {
@@ -113,16 +180,21 @@
       "timestamp": "2020-01-02T00:00:00Z",
       "status": "valid",
       "flags": [],
-      "start_seconds": 1.0,
-      "end_seconds": 2.0,
-      "start_frame": 44100,
-      "end_frame": 88200,
+      "start_seconds": 1.1500680272108843,
+      "end_seconds": 2.1710884353741497,
+      "start_frame": 50718,
+      "end_frame": 95745,
       "audible": true,
-      "speed_m_s": 0.2775907121806603,
-      "speed_normalized": 0.11103628487226411,
+      "source_values": {
+        "speed_m_s": 0.2775907121806603,
+        "direction_deg": 342.571940350378,
+        "u_m_s": -0.0831406611244152,
+        "v_m_s": 0.26484756739823256
+      },
+      "level_normalized": 0.11103628487226411,
+      "rate_normalized": 0.0842526276541295,
       "gain_db": -32.00269374459849,
       "amplitude": 0.022599967895542104,
-      "direction_deg": 342.571940350378,
       "pan": -0.2995080796158122
     },
     {
@@ -130,16 +202,21 @@
       "timestamp": "2020-01-03T00:00:00Z",
       "status": "valid",
       "flags": [],
-      "start_seconds": 2.0,
-      "end_seconds": 3.0,
-      "start_frame": 88200,
-      "end_frame": 132300,
+      "start_seconds": 2.1710884353741497,
+      "end_seconds": 3.0880725623582768,
+      "start_frame": 95745,
+      "end_frame": 136184,
       "audible": true,
-      "speed_m_s": 0.38349751858076186,
-      "speed_normalized": 0.15339900743230475,
+      "source_values": {
+        "speed_m_s": 0.38349751858076186,
+        "direction_deg": 340.5355722219135,
+        "u_m_s": -0.1277896389854596,
+        "v_m_s": 0.36158008093030747
+      },
+      "level_normalized": 0.15339900743230475,
+      "rate_normalized": 0.16945089024016258,
       "gain_db": -30.47763573243703,
       "amplitude": 0.026937713079154373,
-      "direction_deg": 340.5355722219135,
       "pan": -0.33322155371012646
     },
     {
@@ -147,16 +224,21 @@
       "timestamp": "2020-01-04T00:00:00Z",
       "status": "valid",
       "flags": [],
-      "start_seconds": 3.0,
-      "end_seconds": 4.0,
-      "start_frame": 132300,
-      "end_frame": 176400,
+      "start_seconds": 3.0880725623582768,
+      "end_seconds": 4.0384353741496595,
+      "start_frame": 136184,
+      "end_frame": 178095,
       "audible": true,
-      "speed_m_s": 0.47104544612061744,
-      "speed_normalized": 0.188418178448247,
+      "source_values": {
+        "speed_m_s": 0.47104544612061744,
+        "direction_deg": 337.46025330958713,
+        "u_m_s": -0.18056314012284283,
+        "v_m_s": 0.4350640926805499
+      },
+      "level_normalized": 0.188418178448247,
+      "rate_normalized": 0.14007668406376894,
       "gain_db": -29.216945575863107,
       "amplitude": 0.0311454945033114,
-      "direction_deg": 337.46025330958713,
       "pan": -0.3833242452716698
     },
     {
@@ -164,16 +246,21 @@
       "timestamp": "2020-01-05T00:00:00Z",
       "status": "valid",
       "flags": [],
-      "start_seconds": 4.0,
-      "end_seconds": 5.0,
-      "start_frame": 176400,
-      "end_frame": 220500,
+      "start_seconds": 4.0384353741496595,
+      "end_seconds": 5.027482993197279,
+      "start_frame": 178095,
+      "end_frame": 221712,
       "audible": true,
-      "speed_m_s": 0.5388832251210395,
-      "speed_normalized": 0.21555329004841578,
+      "source_values": {
+        "speed_m_s": 0.5388832251210395,
+        "direction_deg": 329.0600868902149,
+        "u_m_s": -0.2770608115878311,
+        "v_m_s": 0.4622038911553485
+      },
+      "level_normalized": 0.21555329004841578,
+      "rate_normalized": 0.10854044640067517,
       "gain_db": -28.24008155825703,
       "amplitude": 0.03485286078206132,
-      "direction_deg": 329.0600868902149,
       "pan": -0.5141388684452005
     },
     {
@@ -181,16 +268,21 @@
       "timestamp": "2020-01-06T00:00:00Z",
       "status": "valid",
       "flags": [],
-      "start_seconds": 5.0,
-      "end_seconds": 6.0,
-      "start_frame": 220500,
-      "end_frame": 264600,
+      "start_seconds": 5.027482993197279,
+      "end_seconds": 6.141587301587301,
+      "start_frame": 221712,
+      "end_frame": 270844,
       "audible": true,
-      "speed_m_s": 0.5523284151754824,
-      "speed_normalized": 0.22093136607019295,
+      "source_values": {
+        "speed_m_s": 0.5523284151754824,
+        "direction_deg": 327.88472094255053,
+        "u_m_s": -0.2936312968434583,
+        "v_m_s": 0.4678112223154645
+      },
+      "level_normalized": 0.22093136607019295,
+      "rate_normalized": 0.02151230408710869,
       "gain_db": -28.046470821473054,
       "amplitude": 0.03563846321818882,
-      "direction_deg": 327.88472094255053,
       "pan": -0.5316244625041922
     },
     {
@@ -198,16 +290,21 @@
       "timestamp": "2020-01-07T00:00:00Z",
       "status": "valid",
       "flags": [],
-      "start_seconds": 6.0,
-      "end_seconds": 7.0,
-      "start_frame": 264600,
-      "end_frame": 308700,
+      "start_seconds": 6.141587301587301,
+      "end_seconds": 6.951927437641723,
+      "start_frame": 270844,
+      "end_frame": 306580,
       "audible": true,
-      "speed_m_s": 0.7270071222938447,
-      "speed_normalized": 0.2908028489175379,
+      "source_values": {
+        "speed_m_s": 0.7270071222938447,
+        "direction_deg": 325.72755050657145,
+        "u_m_s": -0.4093986170182176,
+        "v_m_s": 0.6007762713769145
+      },
+      "level_normalized": 0.2908028489175379,
+      "rate_normalized": 0.2794859313893797,
       "gain_db": -25.531097438968636,
       "amplitude": 0.04760884411847921,
-      "direction_deg": 325.72755050657145,
       "pan": -0.56312875687722
     },
     {
@@ -215,16 +312,21 @@
       "timestamp": "2020-01-08T00:00:00Z",
       "status": "valid",
       "flags": [],
-      "start_seconds": 7.0,
-      "end_seconds": 8.0,
-      "start_frame": 308700,
-      "end_frame": 352800,
+      "start_seconds": 6.951927437641723,
+      "end_seconds": 8.037687074829932,
+      "start_frame": 306580,
+      "end_frame": 354462,
       "audible": true,
-      "speed_m_s": 0.7516826488102671,
-      "speed_normalized": 0.30067305952410683,
+      "source_values": {
+        "speed_m_s": 0.7516826488102671,
+        "direction_deg": 323.34651698421806,
+        "u_m_s": -0.4487350042516271,
+        "v_m_s": 0.6030453552442897
+      },
+      "level_normalized": 0.30067305952410683,
+      "rate_normalized": 0.03948084242627581,
       "gain_db": -25.175769857132153,
       "amplitude": 0.04959684111177913,
-      "direction_deg": 323.34651698421806,
       "pan": -0.5969740088611424
     },
     {
@@ -232,16 +334,21 @@
       "timestamp": "2020-01-09T00:00:00Z",
       "status": "valid",
       "flags": [],
-      "start_seconds": 8.0,
-      "end_seconds": 9.0,
-      "start_frame": 352800,
-      "end_frame": 396900,
+      "start_seconds": 8.037687074829932,
+      "end_seconds": 9.0540589569161,
+      "start_frame": 354462,
+      "end_frame": 399284,
       "audible": true,
-      "speed_m_s": 0.6968830630748315,
-      "speed_normalized": 0.2787532252299326,
+      "source_values": {
+        "speed_m_s": 0.6968830630748315,
+        "direction_deg": 325.7454797153782,
+        "u_m_s": -0.3922546664340135,
+        "v_m_s": 0.5760054515899137
+      },
+      "level_normalized": 0.2787532252299326,
+      "rate_normalized": 0.08767933717669685,
       "gain_db": -25.964883891722426,
       "amplitude": 0.04528958225766064,
-      "direction_deg": 325.7454797153782,
       "pan": -0.5628701387909795
     },
     {
@@ -249,16 +356,21 @@
       "timestamp": "2020-01-10T00:00:00Z",
       "status": "valid",
       "flags": [],
-      "start_seconds": 9.0,
-      "end_seconds": 10.0,
-      "start_frame": 396900,
-      "end_frame": 441000,
+      "start_seconds": 9.0540589569161,
+      "end_seconds": 9.911927437641724,
+      "start_frame": 399284,
+      "end_frame": 437116,
       "audible": true,
-      "speed_m_s": 0.5549675697249115,
-      "speed_normalized": 0.22198702788996458,
+      "source_values": {
+        "speed_m_s": 0.5549675697249115,
+        "direction_deg": 315.1712549219468,
+        "u_m_s": -0.3912466481669153,
+        "v_m_s": 0.39359250976679994
+      },
+      "level_normalized": 0.22198702788996458,
+      "rate_normalized": 0.22706478935987218,
       "gain_db": -28.008466995961275,
       "amplitude": 0.03579473566744195,
-      "direction_deg": 315.1712549219468,
       "pan": -0.7049901102524784
     },
     {
@@ -266,16 +378,21 @@
       "timestamp": "2020-01-11T00:00:00Z",
       "status": "valid",
       "flags": [],
-      "start_seconds": 10.0,
-      "end_seconds": 11.0,
-      "start_frame": 441000,
-      "end_frame": 485100,
+      "start_seconds": 9.911927437641724,
+      "end_seconds": 10.784739229024943,
+      "start_frame": 437116,
+      "end_frame": 475607,
       "audible": true,
-      "speed_m_s": 0.42261052456187415,
-      "speed_normalized": 0.16904420982474966,
+      "source_values": {
+        "speed_m_s": 0.42261052456187415,
+        "direction_deg": 320.08139719599046,
+        "u_m_s": -0.27118861621955626,
+        "v_m_s": 0.3241240347511808
+      },
+      "level_normalized": 0.16904420982474966,
+      "rate_normalized": 0.21177127226085968,
       "gain_db": -29.91440844630901,
       "amplitude": 0.028742337661905513,
-      "direction_deg": 320.08139719599046,
       "pan": -0.6416986810744985
     },
     {
@@ -283,16 +400,21 @@
       "timestamp": "2020-01-12T00:00:00Z",
       "status": "valid",
       "flags": [],
-      "start_seconds": 11.0,
-      "end_seconds": 12.0,
-      "start_frame": 485100,
-      "end_frame": 529200,
+      "start_seconds": 10.784739229024943,
+      "end_seconds": 11.80469387755102,
+      "start_frame": 475607,
+      "end_frame": 520587,
       "audible": true,
-      "speed_m_s": 0.36945821673288104,
-      "speed_normalized": 0.1477832866931524,
+      "source_values": {
+        "speed_m_s": 0.36945821673288104,
+        "direction_deg": 338.4395018411806,
+        "u_m_s": -0.13576977744070962,
+        "v_m_s": 0.3436072488250803
+      },
+      "level_normalized": 0.1477832866931524,
+      "rate_normalized": 0.08504369252638899,
       "gain_db": -30.679801679046513,
       "amplitude": 0.026317972299978815,
-      "direction_deg": 338.4395018411806,
       "pan": -0.36748344275929695
     },
     {
@@ -300,16 +422,21 @@
       "timestamp": "2020-01-13T00:00:00Z",
       "status": "valid",
       "flags": [],
-      "start_seconds": 12.0,
-      "end_seconds": 13.0,
-      "start_frame": 529200,
-      "end_frame": 573300,
+      "start_seconds": 11.80469387755102,
+      "end_seconds": 12.750770975056689,
+      "start_frame": 520587,
+      "end_frame": 562309,
       "audible": true,
-      "speed_m_s": 0.2796187450480892,
-      "speed_normalized": 0.11184749801923569,
+      "source_values": {
+        "speed_m_s": 0.2796187450480892,
+        "direction_deg": 342.55224029395964,
+        "u_m_s": -0.08383979645513555,
+        "v_m_s": 0.2667536899700354
+      },
+      "level_normalized": 0.11184749801923569,
+      "rate_normalized": 0.1437431546956669,
       "gain_db": -31.973490071307516,
       "amplitude": 0.02267608132541942,
-      "direction_deg": 342.55224029395964,
       "pan": -0.2998361087727389
     },
     {
@@ -317,16 +444,21 @@
       "timestamp": "2020-01-14T00:00:00Z",
       "status": "valid",
       "flags": [],
-      "start_seconds": 13.0,
-      "end_seconds": 14.0,
-      "start_frame": 573300,
-      "end_frame": 617400,
+      "start_seconds": 12.750770975056689,
+      "end_seconds": 13.798820861678005,
+      "start_frame": 562309,
+      "end_frame": 608528,
       "audible": true,
-      "speed_m_s": 0.23906520980099616,
-      "speed_normalized": 0.09562608392039847,
+      "source_values": {
+        "speed_m_s": 0.23906520980099616,
+        "direction_deg": 342.15640939218883,
+        "u_m_s": -0.07325426503154363,
+        "v_m_s": 0.2275653470805313
+      },
+      "level_normalized": 0.09562608392039847,
+      "rate_normalized": 0.06488565639534888,
       "gain_db": -32.557460978865656,
       "amplitude": 0.021201640219738506,
-      "direction_deg": 342.15640939218883,
       "pan": -0.30641959611154823
     },
     {
@@ -334,16 +466,21 @@
       "timestamp": "2020-01-15T00:00:00Z",
       "status": "valid",
       "flags": [],
-      "start_seconds": 14.0,
-      "end_seconds": 15.0,
-      "start_frame": 617400,
-      "end_frame": 661500,
+      "start_seconds": 13.798820861678005,
+      "end_seconds": 14.803537414965986,
+      "start_frame": 608528,
+      "end_frame": 652836,
       "audible": true,
-      "speed_m_s": 0.29933906645169434,
-      "speed_normalized": 0.11973562658067774,
+      "source_values": {
+        "speed_m_s": 0.29933906645169434,
+        "direction_deg": 316.56480479343975,
+        "u_m_s": -0.2058056946531139,
+        "v_m_s": 0.2173658040090969
+      },
+      "level_normalized": 0.11973562658067774,
+      "rate_normalized": 0.0964381706411171,
       "gain_db": -31.689517443095603,
       "amplitude": 0.023429695116115964,
-      "direction_deg": 316.56480479343975,
       "pan": -0.6875336957941829
     },
     {
@@ -351,16 +488,21 @@
       "timestamp": "2020-01-16T00:00:00Z",
       "status": "valid",
       "flags": [],
-      "start_seconds": 15.0,
-      "end_seconds": 16.0,
-      "start_frame": 661500,
-      "end_frame": 705600,
+      "start_seconds": 14.803537414965986,
+      "end_seconds": 15.561428571428571,
+      "start_frame": 652836,
+      "end_frame": 686259,
       "audible": true,
-      "speed_m_s": 0.5149433829973785,
-      "speed_normalized": 0.2059773531989514,
+      "source_values": {
+        "speed_m_s": 0.5149433829973785,
+        "direction_deg": 312.0575476282338,
+        "u_m_s": -0.38233123858035334,
+        "v_m_s": 0.3449485638445214
+      },
+      "level_normalized": 0.2059773531989514,
+      "rate_normalized": 0.3449669064730947,
       "gain_db": -28.58481528483775,
       "amplitude": 0.03349667852076279,
-      "direction_deg": 312.0575476282338,
       "pan": -0.742472378914518
     },
     {
@@ -368,16 +510,21 @@
       "timestamp": "2020-01-17T00:00:00Z",
       "status": "valid",
       "flags": [],
-      "start_seconds": 16.0,
-      "end_seconds": 17.0,
-      "start_frame": 705600,
-      "end_frame": 749700,
+      "start_seconds": 15.561428571428571,
+      "end_seconds": 16.521836734693878,
+      "start_frame": 686259,
+      "end_frame": 728613,
       "audible": true,
-      "speed_m_s": 0.5972202521842302,
-      "speed_normalized": 0.2388881008736921,
+      "source_values": {
+        "speed_m_s": 0.5972202521842302,
+        "direction_deg": 305.4556173322183,
+        "u_m_s": -0.48647477463495076,
+        "v_m_s": 0.34643083474608527
+      },
+      "level_normalized": 0.2388881008736921,
+      "rate_normalized": 0.1316429906989628,
       "gain_db": -27.400028368547087,
       "amplitude": 0.03839203130165696,
-      "direction_deg": 305.4556173322183,
       "pan": -0.8145651003222898
     },
     {
@@ -385,16 +532,21 @@
       "timestamp": "2020-01-18T00:00:00Z",
       "status": "valid",
       "flags": [],
-      "start_seconds": 17.0,
-      "end_seconds": 18.0,
-      "start_frame": 749700,
-      "end_frame": 793800,
+      "start_seconds": 16.521836734693878,
+      "end_seconds": 17.48342403628118,
+      "start_frame": 728613,
+      "end_frame": 771019,
       "audible": true,
-      "speed_m_s": 0.6788853904600659,
-      "speed_normalized": 0.27155415618402634,
+      "source_values": {
+        "speed_m_s": 0.6788853904600659,
+        "direction_deg": 299.59733746441657,
+        "u_m_s": -0.5903029868682342,
+        "v_m_s": 0.33530248593554657
+      },
+      "level_normalized": 0.27155415618402634,
+      "rate_normalized": 0.13066422124133692,
       "gain_db": -26.22405037737505,
       "amplitude": 0.04395820910368312,
-      "direction_deg": 299.59733746441657,
       "pan": -0.8695178820510465
     },
     {
@@ -402,16 +554,21 @@
       "timestamp": "2020-01-19T00:00:00Z",
       "status": "valid",
       "flags": [],
-      "start_seconds": 18.0,
-      "end_seconds": 19.0,
-      "start_frame": 793800,
-      "end_frame": 837900,
+      "start_seconds": 17.48342403628118,
+      "end_seconds": 18.513333333333332,
+      "start_frame": 771019,
+      "end_frame": 816438,
       "audible": true,
-      "speed_m_s": 0.6302677750474154,
-      "speed_normalized": 0.25210711001896613,
+      "source_values": {
+        "speed_m_s": 0.6302677750474154,
+        "direction_deg": 288.951015630353,
+        "u_m_s": -0.596105100310726,
+        "v_m_s": 0.20468555798286947
+      },
+      "level_normalized": 0.25210711001896613,
+      "rate_normalized": 0.07778818466024084,
       "gain_db": -26.92414403931722,
       "amplitude": 0.04055415040088001,
-      "direction_deg": 288.951015630353,
       "pan": -0.9457965707764145
     },
     {
@@ -419,16 +576,21 @@
       "timestamp": "2020-01-20T00:00:00Z",
       "status": "valid",
       "flags": [],
-      "start_seconds": 19.0,
-      "end_seconds": 20.0,
-      "start_frame": 837900,
-      "end_frame": 882000,
+      "start_seconds": 18.513333333333332,
+      "end_seconds": 19.43403628117914,
+      "start_frame": 816438,
+      "end_frame": 857041,
       "audible": true,
-      "speed_m_s": 0.5264727968650249,
-      "speed_normalized": 0.21058911874600997,
+      "source_values": {
+        "speed_m_s": 0.5264727968650249,
+        "direction_deg": 287.3720605815414,
+        "u_m_s": -0.5024582865921295,
+        "v_m_s": 0.15719184480685755
+      },
+      "level_normalized": 0.21058911874600997,
+      "rate_normalized": 0.16607196509182465,
       "gain_db": -28.41879172514364,
       "amplitude": 0.03414309788796884,
-      "direction_deg": 287.3720605815414,
       "pan": -0.954386037767015
     },
     {
@@ -436,16 +598,21 @@
       "timestamp": "2020-01-21T00:00:00Z",
       "status": "valid",
       "flags": [],
-      "start_seconds": 20.0,
-      "end_seconds": 21.0,
-      "start_frame": 882000,
-      "end_frame": 926100,
+      "start_seconds": 19.43403628117914,
+      "end_seconds": 20.548480725623584,
+      "start_frame": 857041,
+      "end_frame": 906188,
       "audible": true,
-      "speed_m_s": 0.5131598640193267,
-      "speed_normalized": 0.20526394560773067,
+      "source_values": {
+        "speed_m_s": 0.5131598640193267,
+        "direction_deg": 280.4856794950868,
+        "u_m_s": -0.5045903122762586,
+        "v_m_s": 0.09338984311627084
+      },
+      "level_normalized": 0.20526394560773067,
+      "rate_normalized": 0.021300692553117173,
       "gain_db": -28.610497958121698,
       "amplitude": 0.03339778091981419,
-      "direction_deg": 280.4856794950868,
       "pan": -0.9833004247917072
     },
     {
@@ -453,16 +620,21 @@
       "timestamp": "2020-01-22T00:00:00Z",
       "status": "valid",
       "flags": [],
-      "start_seconds": 21.0,
-      "end_seconds": 22.0,
-      "start_frame": 926100,
-      "end_frame": 970200,
+      "start_seconds": 20.548480725623584,
+      "end_seconds": 21.490657596371882,
+      "start_frame": 906188,
+      "end_frame": 947738,
       "audible": true,
-      "speed_m_s": 0.4212320843191203,
-      "speed_normalized": 0.16849283372764812,
+      "source_values": {
+        "speed_m_s": 0.4212320843191203,
+        "direction_deg": 282.13919282669895,
+        "u_m_s": -0.4118131747262531,
+        "v_m_s": 0.0885797831433054
+      },
+      "level_normalized": 0.16849283372764812,
+      "rate_normalized": 0.14708444752033023,
       "gain_db": -29.934257985804667,
       "amplitude": 0.028676728865322184,
-      "direction_deg": 282.13919282669895,
       "pan": -0.9776396197167841
     },
     {
@@ -470,16 +642,21 @@
       "timestamp": "2020-01-23T00:00:00Z",
       "status": "valid",
       "flags": [],
-      "start_seconds": 22.0,
-      "end_seconds": 23.0,
-      "start_frame": 970200,
-      "end_frame": 1014300,
+      "start_seconds": 21.490657596371882,
+      "end_seconds": 22.492562358276643,
+      "start_frame": 947738,
+      "end_frame": 991922,
       "audible": true,
-      "speed_m_s": 0.35961376166104814,
-      "speed_normalized": 0.14384550466441925,
+      "source_values": {
+        "speed_m_s": 0.35961376166104814,
+        "direction_deg": 279.5572054001667,
+        "u_m_s": -0.35462243870355636,
+        "v_m_s": 0.05970748314869367
+      },
+      "level_normalized": 0.14384550466441925,
+      "rate_normalized": 0.09858931625291545,
       "gain_db": -30.821561832080906,
       "amplitude": 0.02589192961978443,
-      "direction_deg": 279.5572054001667,
       "pan": -0.9861203227194728
     },
     {
@@ -487,16 +664,21 @@
       "timestamp": "2020-01-24T00:00:00Z",
       "status": "valid",
       "flags": [],
-      "start_seconds": 23.0,
-      "end_seconds": 24.0,
-      "start_frame": 1014300,
-      "end_frame": 1058400,
+      "start_seconds": 22.492562358276643,
+      "end_seconds": 23.55108843537415,
+      "start_frame": 991922,
+      "end_frame": 1038603,
       "audible": true,
-      "speed_m_s": 0.3235843579039472,
-      "speed_normalized": 0.12943374316157888,
+      "source_values": {
+        "speed_m_s": 0.3235843579039472,
+        "direction_deg": 287.3396744022741,
+        "u_m_s": -0.30887895470284316,
+        "v_m_s": 0.09643976369625105
+      },
+      "level_normalized": 0.12943374316157888,
+      "rate_normalized": 0.0576470460113615,
       "gain_db": -31.34038524618316,
       "amplitude": 0.02439064286226019,
-      "direction_deg": 287.3396744022741,
       "pan": -0.9545546537034116
     },
     {
@@ -504,16 +686,21 @@
       "timestamp": "2020-01-25T00:00:00Z",
       "status": "valid",
       "flags": [],
-      "start_seconds": 24.0,
-      "end_seconds": 25.0,
-      "start_frame": 1058400,
-      "end_frame": 1102500,
+      "start_seconds": 23.55108843537415,
+      "end_seconds": 24.684603174603176,
+      "start_frame": 1038603,
+      "end_frame": 1088591,
       "audible": true,
-      "speed_m_s": 0.3296650909437906,
-      "speed_normalized": 0.13186603637751623,
+      "source_values": {
+        "speed_m_s": 0.3296650909437906,
+        "direction_deg": 286.1848051530321,
+        "u_m_s": -0.31659968550486256,
+        "v_m_s": 0.09188966930618404
+      },
+      "level_normalized": 0.13186603637751623,
+      "rate_normalized": 0.009729172863749413,
       "gain_db": -31.252822690409413,
       "amplitude": 0.02463776876700953,
-      "direction_deg": 286.1848051530321,
       "pan": -0.9603676403785328
     },
     {
@@ -521,16 +708,21 @@
       "timestamp": "2020-01-26T00:00:00Z",
       "status": "valid",
       "flags": [],
-      "start_seconds": 25.0,
-      "end_seconds": 26.0,
-      "start_frame": 1102500,
-      "end_frame": 1146600,
+      "start_seconds": 24.684603174603176,
+      "end_seconds": 25.694739229024943,
+      "start_frame": 1088591,
+      "end_frame": 1133138,
       "audible": true,
-      "speed_m_s": 0.38738712233438344,
-      "speed_normalized": 0.1549548489337534,
+      "source_values": {
+        "speed_m_s": 0.38738712233438344,
+        "direction_deg": 278.06044325348705,
+        "u_m_s": -0.38356000847926675,
+        "v_m_s": 0.05431852764848659
+      },
+      "level_normalized": 0.1549548489337534,
+      "rate_normalized": 0.09235525022494862,
       "gain_db": -30.42162543838488,
       "amplitude": 0.027111980128697612,
-      "direction_deg": 278.06044325348705,
       "pan": -0.9901206993354486
     },
     {
@@ -538,16 +730,21 @@
       "timestamp": "2020-01-27T00:00:00Z",
       "status": "valid",
       "flags": [],
-      "start_seconds": 26.0,
-      "end_seconds": 27.0,
-      "start_frame": 1146600,
-      "end_frame": 1190700,
+      "start_seconds": 25.694739229024943,
+      "end_seconds": 26.791632653061225,
+      "start_frame": 1133138,
+      "end_frame": 1181511,
       "audible": true,
-      "speed_m_s": 0.40758135623970393,
-      "speed_normalized": 0.16303254249588156,
+      "source_values": {
+        "speed_m_s": 0.40758135623970393,
+        "direction_deg": 270.06507243636315,
+        "u_m_s": -0.407581093374478,
+        "v_m_s": 0.00046290156780041047
+      },
+      "level_normalized": 0.16303254249588156,
+      "rate_normalized": 0.0323107742485127,
       "gain_db": -30.130828470148263,
       "amplitude": 0.028035033922439945,
-      "direction_deg": 270.06507243636315,
       "pan": -0.9999993550607212
     },
     {
@@ -555,16 +752,21 @@
       "timestamp": "2020-01-28T00:00:00Z",
       "status": "valid",
       "flags": [],
-      "start_seconds": 27.0,
-      "end_seconds": 28.0,
-      "start_frame": 1190700,
-      "end_frame": 1234800,
+      "start_seconds": 26.791632653061225,
+      "end_seconds": 27.844104308390023,
+      "start_frame": 1181511,
+      "end_frame": 1227925,
       "audible": true,
-      "speed_m_s": 0.3689449621249434,
-      "speed_normalized": 0.14757798484997736,
+      "source_values": {
+        "speed_m_s": 0.3689449621249434,
+        "direction_deg": 274.35770530573103,
+        "u_m_s": -0.3678783839852248,
+        "v_m_s": 0.028033545508825863
+      },
+      "level_normalized": 0.14757798484997736,
+      "rate_normalized": 0.061818230583616796,
       "gain_db": -30.687192545400812,
       "amplitude": 0.02629558773240058,
-      "direction_deg": 274.35770530573103,
       "pan": -0.9971091131490843
     },
     {
@@ -572,16 +774,21 @@
       "timestamp": "2020-01-29T00:00:00Z",
       "status": "valid",
       "flags": [],
-      "start_seconds": 28.0,
-      "end_seconds": 29.0,
-      "start_frame": 1234800,
-      "end_frame": 1278900,
+      "start_seconds": 27.844104308390023,
+      "end_seconds": 28.98832199546485,
+      "start_frame": 1227925,
+      "end_frame": 1278385,
       "audible": true,
-      "speed_m_s": 0.3668254447017545,
-      "speed_normalized": 0.1467301778807018,
+      "source_values": {
+        "speed_m_s": 0.3668254447017545,
+        "direction_deg": 263.73964267731907,
+        "u_m_s": -0.36463793331862343,
+        "v_m_s": -0.04000105580810447
+      },
+      "level_normalized": 0.1467301778807018,
+      "rate_normalized": 0.003391227877102221,
       "gain_db": -30.717713596294736,
       "amplitude": 0.026203350714070792,
-      "direction_deg": 263.73964267731907,
       "pan": -0.9940366421830154
     },
     {
@@ -589,16 +796,21 @@
       "timestamp": "2020-01-30T00:00:00Z",
       "status": "valid",
       "flags": [],
-      "start_seconds": 29.0,
+      "start_seconds": 28.98832199546485,
       "end_seconds": 30.0,
-      "start_frame": 1278900,
+      "start_frame": 1278385,
       "end_frame": 1323000,
       "audible": true,
-      "speed_m_s": 0.42382401155986893,
-      "speed_normalized": 0.16952960462394756,
+      "source_values": {
+        "speed_m_s": 0.42382401155986893,
+        "direction_deg": 256.3167292621898,
+        "u_m_s": -0.4117951362621435,
+        "v_m_s": -0.10025746119637459
+      },
+      "level_normalized": 0.16952960462394756,
+      "rate_normalized": 0.09119770697298302,
       "gain_db": -29.896934233537884,
       "amplitude": 0.02880021950188041,
-      "direction_deg": 256.3167292621898,
       "pan": -0.9716182307523029
     }
   ],
@@ -611,6 +823,6 @@
     "frames": 1323000,
     "duration_seconds": 30.0,
     "byte_count": 5292044,
-    "sha256": "fcb1bf2a51db319c0d8090d059ef0096d4934e18e74ab90ca7614cc39c9ec15c"
+    "sha256": "0ba104b77d59bc20131a846f183d625adbed9ba0b31427beac5533e1bb06221f"
   }
 }
