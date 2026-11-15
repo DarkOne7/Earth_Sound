@@ -53,7 +53,7 @@ Errors are JSON with `detail` and an `error` code:
 | `422` | `unprocessable_data` | The data cannot satisfy the request: unknown location, empty window, too few usable samples, or a layout too dense to render |
 | `422` | (FastAPI validation) | A parameter is out of range or of the wrong type |
 | `503` | `sample_unavailable` | The sample has not been fetched. The body includes `domain`, `sample_file` and `fetch_hint` |
-| `500` | `sample_invalid` | The sample file is unreadable or malformed |
+| `500` | `sample_invalid` | The sample file is unreadable or malformed (for example a NetCDF or FITS file that does not parse, or a CSV that is empty, lacks required columns, has unparseable dates or duplicate rows) |
 
 ## Audio delivery
 

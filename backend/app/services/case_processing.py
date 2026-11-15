@@ -78,6 +78,11 @@ class CaseProcessingError(ValueError):
     """Raised when a case series cannot be processed under the documented rules."""
 
 
+class CaseSampleError(CaseProcessingError):
+    """The sample file itself is absent, unreadable or malformed, as opposed to a request
+    the data cannot satisfy. Messages name the file, never its full path."""
+
+
 @dataclass(frozen=True)
 class ReportingCadence:
     """What cadence the source rows actually use, detected rather than assumed."""
@@ -105,14 +110,17 @@ def load_case_frame(path: str | Path) -> pd.DataFrame:
     """Read a fetched OWID subset CSV and check that it has the expected columns."""
     path = Path(path)
     if not path.is_file():
-        raise CaseProcessingError(f"Case data file not found: {path}")
-    frame = pd.read_csv(path)
+        raise CaseSampleError(f"Case data file not found: {path.name}")
+    try:
+        frame = pd.read_csv(path)
+    except (pd.errors.ParserError, pd.errors.EmptyDataError, UnicodeDecodeError) as error:
+        raise CaseSampleError(f"{path.name} is not a readable CSV file: {type(error).__name__}") from error
     missing = [column for column in REQUIRED_COLUMNS if column not in frame.columns]
     if missing:
-        raise CaseProcessingError(f"{path} is missing required column(s): {', '.join(missing)}")
+        raise CaseSampleError(f"{path.name} is missing required column(s): {', '.join(missing)}")
     frame["date"] = pd.to_datetime(frame["date"], errors="coerce")
     if frame["date"].isna().any():
-        raise CaseProcessingError(f"{path} contains unparseable date values")
+        raise CaseSampleError(f"{path.name} contains unparseable date values")
     return frame
 
 
@@ -125,7 +133,7 @@ def select_location(frame: pd.DataFrame, location: str) -> pd.DataFrame:
         raise CaseProcessingError(f"Location {location!r} is not in the data. Available: {hint}")
     if rows["date"].duplicated().any():
         duplicate = rows.loc[rows["date"].duplicated(), "date"].iloc[0].date()
-        raise CaseProcessingError(f"Duplicate row for {location} on {duplicate}")
+        raise CaseSampleError(f"Duplicate row for {location} on {duplicate}")
     return rows
 
 
@@ -307,7 +315,7 @@ def process_case_series(
     rows = select_location(frame, location)
     column = METRIC_COLUMNS[metric]
     if column not in rows.columns:
-        raise CaseProcessingError(f"Metric column {column!r} is not in the data")
+        raise CaseSampleError(f"Metric column {column!r} is not in the data")
     cadence = detect_reporting_cadence(rows, column)
     reference = METRIC_REFERENCES[metric]
 

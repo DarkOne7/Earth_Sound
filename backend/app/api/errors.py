@@ -14,7 +14,7 @@ from __future__ import annotations
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from app.services.case_processing import CaseProcessingError
+from app.services.case_processing import CaseProcessingError, CaseSampleError
 from app.services.catalog import SampleUnavailableError
 from app.services.current_processing import CurrentProcessingError, UnitConversionError
 from app.services.dataset_loader import DatasetLoadError
@@ -23,9 +23,10 @@ from app.services.sonification import SonificationError
 from app.services.spectrum_sonification import SpectrumError
 
 CLIENT_ERRORS: tuple[type[Exception], ...] = (CaseProcessingError, CurrentProcessingError, SonificationError)
-# Starlette picks the handler by the error's MRO, so UnitConversionError (a
-# CurrentProcessingError subclass, but a property of the file) lands here.
+# Starlette picks the handler by the error's MRO, so UnitConversionError and
+# CaseSampleError (subclasses of client errors, but properties of the file) land here.
 SAMPLE_ERRORS: tuple[type[Exception], ...] = (
+    CaseSampleError,
     DatasetLoadError,
     SeriesExtractionError,
     SpectrumError,
