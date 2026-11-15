@@ -1,0 +1,124 @@
+{
+  "environment": {
+    "measured_at_utc": "2026-11-15T07:52:04+00:00",
+    "python": "3.15.0",
+    "implementation": "CPython",
+    "platform": "Windows-11-10.0.26300-SP0",
+    "machine": "AMD64",
+    "processor": "Intel64 Family 6 Model 151 Stepping 2, GenuineIntel",
+    "cpu_count": 12,
+    "numpy": "2.5.4",
+    "pandas": "3.1.1",
+    "xarray": "2026.9.0"
+  },
+  "results": {
+    "ocean.point.extract": {
+      "runs": 10,
+      "min_s": 0.1938,
+      "median_s": 0.2045,
+      "max_s": 0.2261,
+      "peak_python_heap_mb": 0.1
+    },
+    "ocean.point.process": {
+      "runs": 10,
+      "min_s": 0.0001,
+      "median_s": 0.0001,
+      "max_s": 0.0002,
+      "peak_python_heap_mb": 0.0
+    },
+    "ocean.point.render": {
+      "runs": 10,
+      "min_s": 0.1004,
+      "median_s": 0.1021,
+      "max_s": 0.1095,
+      "peak_python_heap_mb": 71.1,
+      "samples": 30
+    },
+    "ocean.region.extract": {
+      "runs": 10,
+      "min_s": 0.1908,
+      "median_s": 0.2015,
+      "max_s": 0.2274,
+      "peak_python_heap_mb": 0.3
+    },
+    "ocean.region.process": {
+      "runs": 10,
+      "min_s": 0.0001,
+      "median_s": 0.0002,
+      "max_s": 0.0002,
+      "peak_python_heap_mb": 0.0
+    },
+    "ocean.region.render": {
+      "runs": 10,
+      "min_s": 0.0988,
+      "median_s": 0.1008,
+      "max_s": 0.1205,
+      "peak_python_heap_mb": 71.1,
+      "samples": 30
+    },
+    "covid.world.process": {
+      "runs": 10,
+      "min_s": 0.0267,
+      "median_s": 0.0337,
+      "max_s": 0.0439,
+      "peak_python_heap_mb": 0.8
+    },
+    "covid.world.render": {
+      "runs": 10,
+      "min_s": 0.1654,
+      "median_s": 0.1691,
+      "max_s": 0.2229,
+      "peak_python_heap_mb": 71.4,
+      "samples": 240
+    },
+    "sirius.render": {
+      "runs": 10,
+      "min_s": 0.1002,
+      "median_s": 0.1031,
+      "max_s": 0.1158,
+      "peak_python_heap_mb": 70.8
+    },
+    "api.ocean.audio.cold": {
+      "runs": 10,
+      "min_s": 0.2987,
+      "median_s": 0.3253,
+      "max_s": 0.3568,
+      "peak_python_heap_mb": 71.2
+    },
+    "api.ocean.audio.warm": {
+      "runs": 10,
+      "min_s": 0.0045,
+      "median_s": 0.0057,
+      "max_s": 0.0087,
+      "peak_python_heap_mb": 0.1
+    },
+    "api.covid.audio.cold": {
+      "runs": 10,
+      "min_s": 0.197,
+      "median_s": 0.2119,
+      "max_s": 0.2415,
+      "peak_python_heap_mb": 71.8
+    },
+    "api.covid.audio.warm": {
+      "runs": 10,
+      "min_s": 0.0061,
+      "median_s": 0.0066,
+      "max_s": 0.008,
+      "peak_python_heap_mb": 0.1
+    },
+    "api.sirius.audio.cold": {
+      "runs": 10,
+      "min_s": 0.0983,
+      "median_s": 0.1033,
+      "max_s": 0.1318,
+      "peak_python_heap_mb": 70.8
+    },
+    "api.sirius.audio.warm": {
+      "runs": 10,
+      "min_s": 0.0023,
+      "median_s": 0.0025,
+      "max_s": 0.0062,
+      "peak_python_heap_mb": 0.1
+    }
+  }
+}

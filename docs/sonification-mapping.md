@@ -150,7 +150,7 @@ Why pan and not pitch: direction is circular. Any mapping onto a linear paramete
 **Omitted** (recorded as `provenance.omitted_mappings`):
 
 - **Temperature → pitch/timbre.** Phase 2 verified at file level (2026-11-14) that OSCAR v2.0 Final granules contain only `u`, `v`, `ug`, `vg`, `lat`, `lon`, `time`. SST appears only as an *input* in the global `source` attribute.
-- **North–south component of direction.** Northward and southward flow are indistinguishable. No clearly interpretable second dimension was identified for the MVP; a candidate (brightness / filter cutoff) is left for Phase 6 listening tests.
+- **North–south component of direction.** Northward and southward flow are indistinguishable. No clearly interpretable second dimension was identified for the MVP; a candidate (brightness / filter cutoff) is left for future listening tests.
 
 ## Domain: COVID-19 reported deaths and cases
 
@@ -271,5 +271,5 @@ Tested in the three test modules:
 - **COVID:** weekly resolution only; the pan moves abruptly between adjacent weeks because week-over-week growth is noisy; the three weeks above 10⁵ deaths are indistinguishable from each other.
 - The −36 dB floor, the 30 s duration and the 20 Hz rhythm floor are product and perceptual choices, not scientific constants. The rhythm floor is a round figure for a gradual perceptual transition, not a sharp threshold.
 - A series with more samples than frames is rejected; a series dense enough to exceed the rhythm floor is rendered with a recorded warning rather than refused.
-- **No listening validation has been done for either domain.** That is Phase 6, and it is the right place to decide whether the pan mappings communicate or merely decorate.
+- **No listening validation has been done for either domain.** The Phase 6 validation ([`validation.md`](validation.md)) measured the audio against these rules but did not test listeners. A listening test is the right place to decide whether the pan mappings communicate or merely decorate.
 - Byte-identity is guaranteed per platform; cross-platform runs are covered by the 1-LSB equivalence criterion above.

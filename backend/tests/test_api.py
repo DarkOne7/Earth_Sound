@@ -3,78 +3,15 @@
 from __future__ import annotations
 
 import hashlib
-import io
 import json
-import wave
-from pathlib import Path
 
 import pytest
+from api_support import WEEKLY_DEATHS, make_settings, wav_info
 from app.config import REPOSITORY_ROOT, Settings, get_settings
 from app.main import app
 from app.services.catalog import render_cache
 from fastapi.testclient import TestClient
 from test_case_processing import weekly_rows, write_csv
-from test_series_extraction import write_sample
-from test_spectrum_sonification import write_fits
-
-WEEKLY_DEATHS = ["10", "20", "40", "80", "160", "320", "640", "1280", "640", "320", "160", "80"]
-
-
-def make_settings(raw: Path, metadata: Path, **overrides) -> Settings:
-    values = {
-        "raw_data_dir": raw,
-        "metadata_dir": metadata,
-        "ocean_sample_file": "ocean/sample.nc",
-        "covid_sample_file": "covid/covid.csv",
-        "sirius_spectrum_file": "sirius_stis_005.fits",
-        # The synthetic ocean grid: lat 0.125..0.625, lon -152..-151.5, 12 days.
-        "processing_latitude": 0.375,
-        "processing_longitude": -151.75,
-        "processing_south": 0.0,
-        "processing_north": 1.0,
-        "processing_west": -152.1,
-        "processing_east": -151.4,
-        "soundscape_duration_seconds": 2.0,
-        "soundscape_sample_rate_hz": 8000,
-        **overrides,
-    }
-    return Settings(_env_file=None, **values)
-
-
-@pytest.fixture
-def data_dirs(tmp_path):
-    raw, metadata = tmp_path / "raw", tmp_path / "metadata"
-    (raw / "ocean").mkdir(parents=True)
-    (raw / "covid").mkdir()
-    metadata.mkdir()
-    write_sample(raw / "ocean" / "sample.nc")
-    covid = write_csv(raw / "covid", weekly_rows("World", WEEKLY_DEATHS) + weekly_rows("Italy", WEEKLY_DEATHS),
-                      name="covid.csv")
-    (metadata / "covid.retrieval.json").write_text(
-        json.dumps({"subset_sha256": "ab" * 32, "source_url": "https://example.org/full_data.csv",
-                    "retrieved_at_utc": "2026-11-14T10:55:25+00:00"}),
-        encoding="utf-8",
-    )
-    write_fits(raw / "sirius_stis_005.fits")
-    return raw, metadata, covid
-
-
-@pytest.fixture
-def client(data_dirs):
-    raw, metadata, _ = data_dirs
-    settings = make_settings(raw, metadata)
-    render_cache.clear()
-    app.dependency_overrides[get_settings] = lambda: settings
-    with TestClient(app) as test_client:
-        yield test_client
-    app.dependency_overrides.clear()
-    render_cache.clear()
-
-
-def wav_info(content: bytes) -> tuple[int, int, int]:
-    with wave.open(io.BytesIO(content)) as reader:
-        return reader.getframerate(), reader.getnchannels(), reader.getnframes()
-
 
 # --- catalog -----------------------------------------------------------------
 

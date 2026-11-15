@@ -145,7 +145,7 @@ The null rule is conservative and matters for countries rather than the world: `
 
 - **Reported, not actual.** These are reported deaths and cases. Excess-mortality estimates put true COVID-19 deaths substantially higher, and reporting completeness varies by country and over time. The soundscape sonifies *what was reported*, which is what the dataset contains.
 - **Weekly resolution.** Within-week variation is not recoverable from this table and is not rendered.
-- **The pan jitters.** Week-over-week growth is noisy, so stereo position moves abruptly between adjacent pulses. That is the data, not a rendering artifact, but whether it communicates or merely distracts is a Phase 6 listening question.
+- **The pan jitters.** Week-over-week growth is noisy, so stereo position moves abruptly between adjacent pulses. That is the data, not a rendering artifact, but whether it communicates or merely distracts is an open listening question.
 - **Three clipped weeks.** The January 2021 peak exceeds the 10⁵ ceiling, so the three loudest weeks are indistinguishable from each other. Raising the ceiling to 10⁵·⁵ would separate them at the cost of a less round, less citable reference.
-- **No listening validation yet.** Phase 6.
+- **No listening validation yet.** The Phase 6 validation covered data, processing, audio and API behaviour, not listening; see [`scientific-limitations.md`](scientific-limitations.md).
 - **`weekly_deaths`/`weekly_cases` columns are unused.** They are trailing 7-day rolling sums held constant between updates, so they overlap between adjacent days. Aggregating the posted totals ourselves gives non-overlapping weeks and keeps the aggregation rule explicit and testable.

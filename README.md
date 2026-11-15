@@ -128,6 +128,14 @@ open("soundscape.wav", "wb").write(rendered.wav_bytes)
 print(rendered.provenance.model_dump_json(indent=2))
 ```
 
+## Validation
+
+Phase 6 checked the whole pipeline against known values on the real samples, injected faults, the published API contract and a bounded performance budget. The record is [`docs/validation.md`](docs/validation.md). **Read [`docs/scientific-limitations.md`](docs/scientific-limitations.md) before interpreting a soundscape.** It covers the nature of each product, its resolution, the assumptions made, and the variables that are not sonified (including SST).
+
+```powershell
+python scripts/benchmark_pipeline.py --repeat 10
+```
+
 Install the optional development dependency before running tests:
 
 ```powershell
