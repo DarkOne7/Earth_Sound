@@ -32,6 +32,21 @@ python -m uvicorn app.main:app --app-dir backend --reload
 
 The health check is available at `http://127.0.0.1:8000/health`. FastAPI's interactive API documentation is available at `http://127.0.0.1:8000/docs` during development.
 
+The API serves the processed series and the soundscapes rendered from the samples you have fetched (see the sections below). `GET /domains` shows which samples are present.
+
+| Endpoint | Returns |
+|---|---|
+| `/series/ocean`, `/series/covid` | The validated series as JSON |
+| `/soundscapes/{ocean,covid,sirius}` | The provenance: every mapping rule, a per-segment trace and the WAV's SHA-256 |
+| `/soundscapes/{ocean,covid,sirius}/audio` | The WAV; its `ETag` is that SHA-256. Supports byte ranges so browsers can seek |
+
+```powershell
+curl "http://127.0.0.1:8000/soundscapes/covid?location=World&metric=deaths"
+curl -o covid.wav "http://127.0.0.1:8000/soundscapes/covid/audio?timing_mode=uniform"
+```
+
+With default parameters, the API's output is identical to the committed reference renders. Parameters, errors, caching and configuration are in [`docs/api.md`](docs/api.md).
+
 ### Configuration
 
 Settings are read from environment variables with the `EARTH_JUKEBOX_` prefix. A root `.env` file is read for local development; `.env` files are ignored by Git. See `.env.example` for the supported settings.

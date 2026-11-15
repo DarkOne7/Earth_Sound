@@ -1,10 +1,13 @@
 """Application settings loaded from environment variables and `.env`."""
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
 
 class Settings(BaseSettings):
@@ -12,6 +15,17 @@ class Settings(BaseSettings):
 
     app_name: str = "Earth Jukebox API"
     environment: Literal["development", "test", "production"] = "development"
+
+    # Phase 5 API. Samples are read from local files produced by the fetch scripts;
+    # the API never downloads data itself. File names are relative to raw_data_dir.
+    raw_data_dir: Path = REPOSITORY_ROOT / "data" / "raw"
+    metadata_dir: Path = REPOSITORY_ROOT / "data" / "metadata"
+    ocean_sample_file: str = "oscar-final-20200101-20200130/oscar-final-20200101-20200130.nc"
+    covid_sample_file: str = "owid-covid-weekly/owid-covid-weekly.csv"
+    sirius_spectrum_file: str = "sirius_stis_005.fits"
+    api_max_duration_seconds: float = Field(default=120.0, gt=0)
+    api_render_cache_size: int = Field(default=32, ge=0)
+    cors_origins: list[str] = Field(default_factory=list)
 
     # Phase 3 processing defaults. They match the Phase 2 reproducible sample
     # (docs/ocean-dataset-decision.md): OSCAR v2.0 Final, 2020-01-01..2020-01-30,
